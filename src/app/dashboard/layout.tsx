@@ -5,7 +5,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Shield, LogOut, Users, FolderOpen } from 'lucide-react';
+import { Shield, LogOut, Users, FolderOpen, Settings } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 export default function DashboardLayout({
   children,
@@ -22,6 +23,7 @@ export default function DashboardLayout({
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = () => {
     logout();
@@ -47,9 +49,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
           <Button
-            variant="secondary"
+            variant={pathname === '/dashboard' ? 'secondary' : 'ghost'}
             className="w-full justify-start"
             size="sm"
+            onClick={() => router.push('/dashboard')}
           >
             <FolderOpen className="mr-2 h-4 w-4" />
             Projets
@@ -63,12 +66,22 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
               <Button
-                variant="ghost"
+                variant={pathname === '/dashboard/users' ? 'secondary' : 'ghost'}
                 className="w-full justify-start"
                 size="sm"
+                onClick={() => router.push('/dashboard/users')}
               >
                 <Users className="mr-2 h-4 w-4" />
                 Utilisateurs
+              </Button>
+              <Button
+                variant={pathname === '/dashboard/settings' ? 'secondary' : 'ghost'}
+                className="w-full justify-start"
+                size="sm"
+                onClick={() => router.push('/dashboard/settings')}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Paramètres
               </Button>
             </>
           )}

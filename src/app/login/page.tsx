@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [checkingSetup, setCheckingSetup] = useState(true);
   const [providers, setProviders] = useState<AuthProviderInfo[]>([]);
   const [activeTab, setActiveTab] = useState<'LOCAL' | 'LDAP'>('LOCAL');
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
   const { login, loginWithTokens, user } = useAuth();
   const router = useRouter();
 
@@ -35,6 +36,7 @@ export default function LoginPage() {
   const oidcProviders = providers.filter((p) => p.type === 'OIDC');
   const samlProviders = providers.filter((p) => p.type === 'SAML');
   const hasMultipleCredentialMethods = hasLocal && hasLdap;
+  const hasCredentialForm = hasLocal || hasLdap || showAdminLogin;
 
   useEffect(() => {
     if (user) {
@@ -243,7 +245,7 @@ export default function LoginPage() {
 
             {/* Separator */}
             {(oidcProviders.length > 0 || samlProviders.length > 0) &&
-              (hasLocal || hasLdap) && (
+              hasCredentialForm && (
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
@@ -283,7 +285,7 @@ export default function LoginPage() {
             )}
 
             {/* Credential form */}
-            {(hasLocal || hasLdap) && (
+            {hasCredentialForm && (
               <form
                 onSubmit={activeTab === 'LDAP' ? handleLdapSubmit : handleLocalSubmit}
                 className="space-y-4"
@@ -330,6 +332,18 @@ export default function LoginPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Admin login fallback — always accessible */}
+        {!hasLocal && !showAdminLogin && (
+          <div className="text-center">
+            <button
+              onClick={() => { setShowAdminLogin(true); setActiveTab('LOCAL'); }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Connexion administrateur
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
