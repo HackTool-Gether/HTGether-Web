@@ -110,8 +110,8 @@ export default function UsersPage() {
   if (currentUser?.role !== 'SUPER_ADMIN') return null;
 
   return (
-    <div className="p-8 max-w-4xl">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 sm:p-8 max-w-4xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold">Utilisateurs</h1>
           <p className="text-muted-foreground">Gérez les comptes de la plateforme</p>
@@ -148,7 +148,7 @@ export default function UsersPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Prénom</Label>
                   <Input
@@ -282,7 +282,7 @@ export default function UsersPage() {
                   <p className="text-xs text-muted-foreground">{u.email}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                   u.role === 'SUPER_ADMIN'
                     ? 'bg-primary/10 text-primary'
