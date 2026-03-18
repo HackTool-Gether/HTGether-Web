@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Shield, LogOut, Users, FolderOpen, Settings } from 'lucide-react';
+import { Shield, LogOut, Users, FolderOpen, Settings, LayoutDashboard } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 export default function DashboardLayout({
@@ -49,7 +49,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
           <Button
-            variant={pathname?.startsWith('/dashboard/projects') || pathname === '/dashboard' ? 'secondary' : 'ghost'}
+            variant={pathname === '/dashboard' ? 'secondary' : 'ghost'}
+            className="w-full justify-start"
+            size="sm"
+            onClick={() => router.push('/dashboard')}
+          >
+            <LayoutDashboard className="mr-2 h-4 w-4" />
+            Dashboard
+          </Button>
+
+          <Button
+            variant={pathname?.startsWith('/dashboard/projects') ? 'secondary' : 'ghost'}
             className="w-full justify-start"
             size="sm"
             onClick={() => router.push('/dashboard/projects')}
@@ -65,7 +75,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             onClick={() => router.push('/dashboard/settings')}
           >
             <Settings className="mr-2 h-4 w-4" />
-            Parametres
+            Paramètres
           </Button>
 
           {user?.role === 'SUPER_ADMIN' && (
