@@ -19,6 +19,13 @@ import {
 } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Building2,
   KeyRound,
   Brain,
@@ -618,17 +625,17 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="aiModel">Modèle</Label>
-                      <select
-                        id="aiModel"
-                        value={ai.model}
-                        onChange={(e) => setAi({ ...ai, model: e.target.value })}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      >
-                        {AI_PROVIDERS.find((p) => p.id === ai.provider)?.models.map((m) => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                      <Label>Modèle</Label>
+                      <Select value={ai.model} onValueChange={(val) => { if (val) setAi({ ...ai, model: val }); }}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AI_PROVIDERS.find((p) => p.id === ai.provider)?.models.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 )}
