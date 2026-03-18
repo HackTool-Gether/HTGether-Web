@@ -49,10 +49,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
           <Button
-            variant={pathname === '/dashboard' ? 'secondary' : 'ghost'}
+            variant={pathname?.startsWith('/dashboard/projects') || pathname === '/dashboard' ? 'secondary' : 'ghost'}
             className="w-full justify-start"
             size="sm"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/dashboard/projects')}
           >
             <FolderOpen className="mr-2 h-4 w-4" />
             Projets

@@ -110,6 +110,13 @@ export const authApi = {
 
   getProfile: (token: string) =>
     apiRequest<User>('/auth/profile', { token }),
+
+  changePassword: (currentPassword: string, newPassword: string, token: string) =>
+    apiRequest<LoginResponse>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+      token,
+    }),
 };
 
 // Setup API
@@ -158,7 +165,7 @@ export const usersApi = {
     apiRequest<User>(`/users/${id}`, { token }),
 
   create: (data: CreateUserData, token: string) =>
-    apiRequest<User>('/users', {
+    apiRequest<CreateUserResponse>('/users', {
       method: 'POST',
       body: JSON.stringify(data),
       token,
@@ -171,6 +178,106 @@ export const usersApi = {
     }),
 };
 
+// Projects API
+export const projectsApi = {
+  getAll: (token: string) =>
+    apiRequest<Project[]>('/projects', { token }),
+
+  getOne: (id: string, token: string) =>
+    apiRequest<ProjectDetail>(`/projects/${id}`, { token }),
+
+  create: (data: CreateProjectData, token: string) =>
+    apiRequest<Project>('/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  update: (id: string, data: Partial<CreateProjectData & { status: string }>, token: string) =>
+    apiRequest<Project>(`/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (id: string, token: string) =>
+    apiRequest<void>(`/projects/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  addMember: (projectId: string, data: { userId: string; role: string }, token: string) =>
+    apiRequest<ProjectMember>(`/projects/${projectId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  removeMember: (projectId: string, memberId: string, token: string) =>
+    apiRequest<void>(`/projects/${projectId}/members/${memberId}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
+// Scopes API
+export const scopesApi = {
+  getAll: (projectId: string, token: string) =>
+    apiRequest<Scope[]>(`/projects/${projectId}/scopes`, { token }),
+
+  getOne: (projectId: string, scopeId: string, token: string) =>
+    apiRequest<ScopeDetail>(`/projects/${projectId}/scopes/${scopeId}`, { token }),
+
+  create: (projectId: string, data: { name: string; description?: string }, token: string) =>
+    apiRequest<Scope>(`/projects/${projectId}/scopes`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  update: (projectId: string, scopeId: string, data: Partial<{ name: string; description: string; status: string }>, token: string) =>
+    apiRequest<Scope>(`/projects/${projectId}/scopes/${scopeId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (projectId: string, scopeId: string, token: string) =>
+    apiRequest<void>(`/projects/${projectId}/scopes/${scopeId}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
+// Notes API
+export const notesApi = {
+  getByScope: (projectId: string, scopeId: string, token: string) =>
+    apiRequest<Note[]>(`/projects/${projectId}/scopes/${scopeId}/notes`, { token }),
+
+  getOne: (noteId: string, token: string) =>
+    apiRequest<NoteDetail>(`/notes/${noteId}`, { token }),
+
+  create: (projectId: string, scopeId: string, data: { title: string; content?: string }, token: string) =>
+    apiRequest<Note>(`/projects/${projectId}/scopes/${scopeId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  update: (noteId: string, data: { title?: string; content?: string }, token: string) =>
+    apiRequest<Note>(`/notes/${noteId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (noteId: string, token: string) =>
+    apiRequest<void>(`/notes/${noteId}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
 // Types
 export interface User {
   id: string;
@@ -179,6 +286,7 @@ export interface User {
   lastName: string;
   role: 'SUPER_ADMIN' | 'USER';
   isActive?: boolean;
+  mustChangePassword?: boolean;
   createdAt?: string;
 }
 
@@ -197,10 +305,13 @@ export interface SetupData {
 
 export interface CreateUserData {
   email: string;
-  password: string;
   firstName: string;
   lastName: string;
   role?: 'SUPER_ADMIN' | 'USER';
+}
+
+export interface CreateUserResponse extends User {
+  generatedPassword: string;
 }
 
 export type AuthProviderType = 'LOCAL' | 'OIDC' | 'LDAP' | 'SAML';
@@ -231,6 +342,78 @@ export interface CompanySettings {
   name: string;
   domain?: string;
   logoUrl?: string;
+}
+
+export type ProjectStatus = 'DRAFT' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DELIVERED' | 'ARCHIVED';
+export type AuditType = 'WEB' | 'INTERNAL_AD' | 'LINUX' | 'MOBILE' | 'OTHER';
+export type ScopeStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'IN_REVIEW';
+
+export interface ProjectMember {
+  id: string;
+  role: 'MANAGER' | 'PENTESTER' | 'CLIENT';
+  user: { id: string; firstName: string; lastName: string; email: string };
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  clientCompany: string;
+  clientNeed: string;
+  context: string;
+  startDate: string;
+  endDate: string;
+  status: ProjectStatus;
+  auditType: AuditType;
+  members: ProjectMember[];
+  _count?: { scopes: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectDetail extends Project {
+  scopes: Scope[];
+}
+
+export interface Scope {
+  id: string;
+  name: string;
+  description?: string;
+  status: ScopeStatus;
+  _count?: { notes: number; components: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScopeDetail extends Scope {
+  project: { id: string; name: string };
+  notes: Note[];
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  author: { id: string; firstName: string; lastName: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NoteDetail extends Note {
+  scope: {
+    id: string;
+    name: string;
+    project: { id: string; name: string };
+  };
+}
+
+export interface CreateProjectData {
+  name: string;
+  clientCompany: string;
+  clientNeed: string;
+  context: string;
+  startDate: string;
+  endDate: string;
+  auditType: AuditType;
 }
 
 export interface OnboardingData {

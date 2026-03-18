@@ -102,8 +102,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      router.push('/dashboard');
+      const response = await login(email, password);
+      if (response.user.mustChangePassword) {
+        router.push('/change-password');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) setError('Email ou mot de passe incorrect');
@@ -127,7 +131,11 @@ export default function LoginPage() {
     try {
       const response = await authApi.ldapLogin(email, password, ldapProvider?.id);
       loginWithTokens(response);
-      router.push('/dashboard');
+      if (response.user.mustChangePassword) {
+        router.push('/change-password');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) setError('Identifiants LDAP incorrects');

@@ -29,6 +29,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Force password change
+      if (user.mustChangePassword) {
+        router.replace('/change-password');
+        return;
+      }
+
       setChecking(false);
     };
 

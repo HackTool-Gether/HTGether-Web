@@ -14,7 +14,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResponse>;
   loginWithTokens: (response: LoginResponse) => void;
   logout: () => void;
 }
@@ -82,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const response = await authApi.login(email, password);
     saveAuth(response);
+    return response;
   };
 
   const loginWithTokens = (response: LoginResponse) => {
