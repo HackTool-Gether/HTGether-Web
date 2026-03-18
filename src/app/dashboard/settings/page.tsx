@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
 import { settingsApi, authProvidersApi, ApiError } from '@/lib/api';
 import type { AuthProviderFull } from '@/lib/api';
+import { useThemePreference } from '@/lib/theme-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,16 +33,22 @@ import {
   Save,
   Trash2,
   Plus,
+  Sun,
 } from 'lucide-react';
 
-const TABS = [
+const ADMIN_TABS = [
+  { id: 'preferences', label: 'Preferences', icon: Sun },
   { id: 'company', label: 'Entreprise', icon: Building2 },
   { id: 'auth', label: 'Authentification', icon: KeyRound },
   { id: 'ai', label: 'Module IA', icon: Brain },
   { id: 'email', label: 'Email', icon: Mail },
 ] as const;
 
-type TabId = (typeof TABS)[number]['id'];
+const USER_TABS = [
+  { id: 'preferences', label: 'Preferences', icon: Sun },
+] as const;
+
+type TabId = 'preferences' | 'company' | 'auth' | 'ai' | 'email';
 
 const AI_PROVIDERS = [
   { id: 'openai', name: 'OpenAI', description: 'GPT-4, GPT-4o', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'] },
@@ -59,8 +65,8 @@ const SSO_PRESETS = [
 
 export default function SettingsPage() {
   const { user, token } = useAuth();
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabId>('company');
+  const { isWhiteMode, toggleWhiteMode } = useThemePreference();
+  const [activeTab, setActiveTab] = useState<TabId>('preferences');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
@@ -91,15 +97,18 @@ export default function SettingsPage() {
     ? `${window.location.origin}/login`
     : 'https://your-domain.com/login';
 
-  // Redirect non-admin
-  useEffect(() => {
-    if (user && user.role !== 'SUPER_ADMIN') {
-      router.replace('/dashboard');
-    }
-  }, [user, router]);
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const visibleTabs = isSuperAdmin ? ADMIN_TABS : USER_TABS;
 
   const loadSettings = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user) return;
+
+    if (!isSuperAdmin) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     try {
       const [allSettings, providers] = await Promise.all([
         settingsApi.getAll(token),
@@ -160,11 +169,17 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, user, isSuperAdmin]);
 
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
+
+  useEffect(() => {
+    if (!isSuperAdmin && activeTab !== 'preferences') {
+      setActiveTab('preferences');
+    }
+  }, [isSuperAdmin, activeTab]);
 
   const showSuccess = (msg: string) => {
     setSuccess(msg);
@@ -344,8 +359,6 @@ export default function SettingsPage() {
     );
   }
 
-  if (user?.role !== 'SUPER_ADMIN') return null;
-
   const localProvider = authProvidersList.find((p) => p.type === 'LOCAL');
   const oidcProviders = authProvidersList.filter((p) => p.type === 'OIDC');
   const ldapProviders = authProvidersList.filter((p) => p.type === 'LDAP');
@@ -359,7 +372,9 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Paramètres</h1>
         <p className="text-muted-foreground">
-          Gérez la configuration de votre plateforme
+          {isSuperAdmin
+            ? 'Gerez la configuration de votre plateforme'
+            : 'Gerez vos preferences personnelles'}
         </p>
       </div>
 
@@ -379,7 +394,7 @@ export default function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border p-1 mb-6">
-        {TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
@@ -398,8 +413,33 @@ export default function SettingsPage() {
         })}
       </div>
 
+      {/* ===== TAB: Preferences ===== */}
+      {activeTab === 'preferences' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Preferences d'affichage</CardTitle>
+            <CardDescription>Personnalisez le mode visuel de la plateforme</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="whiteMode" className="text-sm font-medium">White mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  Active une interface claire
+                </p>
+              </div>
+              <Switch
+                id="whiteMode"
+                checked={isWhiteMode}
+                onCheckedChange={toggleWhiteMode}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ===== TAB: Entreprise ===== */}
-      {activeTab === 'company' && (
+      {isSuperAdmin && activeTab === 'company' && (
         <Card>
           <CardHeader>
             <CardTitle>Informations entreprise</CardTitle>
@@ -435,7 +475,7 @@ export default function SettingsPage() {
       )}
 
       {/* ===== TAB: Authentification ===== */}
-      {activeTab === 'auth' && (
+      {isSuperAdmin && activeTab === 'auth' && (
         <div className="space-y-4">
           {/* Local provider */}
           {localProvider && (
@@ -526,7 +566,7 @@ export default function SettingsPage() {
       )}
 
       {/* ===== TAB: Module IA ===== */}
-      {activeTab === 'ai' && (
+      {isSuperAdmin && activeTab === 'ai' && (
         <Card>
           <CardHeader>
             <CardTitle>Module IA</CardTitle>
@@ -606,7 +646,7 @@ export default function SettingsPage() {
       )}
 
       {/* ===== TAB: Email ===== */}
-      {activeTab === 'email' && (
+      {isSuperAdmin && activeTab === 'email' && (
         <Card>
           <CardHeader>
             <CardTitle>Configuration email</CardTitle>

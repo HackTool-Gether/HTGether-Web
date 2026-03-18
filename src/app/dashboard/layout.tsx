@@ -58,6 +58,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             Projets
           </Button>
 
+          <Button
+            variant={pathname === '/dashboard/settings' ? 'secondary' : 'ghost'}
+            className="w-full justify-start"
+            size="sm"
+            onClick={() => router.push('/dashboard/settings')}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Parametres
+          </Button>
+
           {user?.role === 'SUPER_ADMIN' && (
             <>
               <div className="px-3 py-2">
@@ -73,15 +83,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               >
                 <Users className="mr-2 h-4 w-4" />
                 Utilisateurs
-              </Button>
-              <Button
-                variant={pathname === '/dashboard/settings' ? 'secondary' : 'ghost'}
-                className="w-full justify-start"
-                size="sm"
-                onClick={() => router.push('/dashboard/settings')}
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                Paramètres
               </Button>
             </>
           )}
