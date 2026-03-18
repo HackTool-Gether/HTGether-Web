@@ -7,7 +7,6 @@ import { notesApi, ApiError } from '@/lib/api';
 import type { NoteDetail } from '@/lib/api';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   ArrowLeft,
@@ -15,12 +14,19 @@ import {
   AlertCircle,
   Check,
   Clock,
+  MoreHorizontal,
+  ChevronRight,
 } from 'lucide-react';
 
 // Lazy-load TipTap editor for SSR compat
 const RichTextEditor = dynamic(
   () => import('@/components/ui/rich-text-editor').then((m) => ({ default: m.RichTextEditor })),
-  { ssr: false, loading: () => <div className="h-[300px] rounded-lg border bg-muted/30 animate-pulse" /> },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[60vh] animate-pulse opacity-10" />
+    ),
+  },
 );
 
 export default function NoteEditorPage() {
@@ -61,13 +67,19 @@ export default function NoteEditorPage() {
     }
   }, [token, noteId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const save = useCallback(async () => {
     if (!token || !note) return;
     setSaving(true);
     try {
-      await notesApi.update(noteId, { title: titleRef.current, content: contentRef.current }, token);
+      await notesApi.update(
+        noteId,
+        { title: titleRef.current, content: contentRef.current },
+        token,
+      );
       setLastSaved(new Date());
       setError('');
     } catch (err) {
@@ -92,9 +104,21 @@ export default function NoteEditorPage() {
     };
   }, []);
 
-  const handleTitleChange = (newTitle: string) => {
-    setTitle(newTitle);
+  const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setTitle(e.target.value);
     scheduleAutosave();
+    // Auto-resize
+    e.target.style.height = 'auto';
+    e.target.style.height = e.target.scrollHeight + 'px';
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Focus the editor
+      const editorEl = document.querySelector('.notion-editor') as HTMLElement;
+      editorEl?.focus();
+    }
   };
 
   const handleContentChange = (html: string) => {
@@ -118,7 +142,7 @@ export default function NoteEditorPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -136,22 +160,31 @@ export default function NoteEditorPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b px-6 py-3">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push(`/dashboard/projects/${projectId}/scopes/${scopeId}`)}
+      {/* Top bar - minimal */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <button
+            onClick={() => router.push(`/dashboard/projects/${projectId}`)}
+            className="hover:text-foreground transition-colors"
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            {note.scope.project.name}
+          </button>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <button
+            onClick={() =>
+              router.push(`/dashboard/projects/${projectId}/scopes/${scopeId}`)
+            }
+            className="hover:text-foreground transition-colors"
+          >
             {note.scope.name}
-          </Button>
-          <span className="text-xs text-muted-foreground">/</span>
-          <span className="text-xs text-muted-foreground">{note.scope.project.name}</span>
+          </button>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span className="text-foreground font-medium truncate max-w-[200px]">
+            {title || 'Sans titre'}
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Save status */}
           {saving ? (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -159,51 +192,66 @@ export default function NoteEditorPage() {
               Sauvegarde...
             </span>
           ) : lastSaved ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Check className="h-3 w-3 text-green-500" />
-              Sauvegardé à {lastSaved.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+            <span className="flex items-center gap-1.5 text-xs text-green-500/80">
+              <Check className="h-3 w-3" />
+              Sauvegarde
             </span>
           ) : (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              {new Date(note.updatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              {new Date(note.updatedAt).toLocaleDateString('fr-FR', {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </span>
           )}
-
-          <Button size="sm" onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-2 h-3.5 w-3.5" />}
-            Sauvegarder
-          </Button>
         </div>
       </div>
 
       {error && (
-        <Alert variant="destructive" className="mx-6 mt-4">
+        <Alert variant="destructive" className="mx-6 mt-4 max-w-3xl self-center w-full">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {/* Editor area */}
-      <div className="flex-1 overflow-auto p-6 max-w-4xl mx-auto w-full">
-        {/* Title */}
-        <Input
-          value={title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="Titre de la note..."
-          className="border-none text-2xl font-bold h-auto py-2 px-0 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/40"
-        />
+      {/* Editor area - centered like Notion */}
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-3xl mx-auto px-6 py-10 lg:px-16">
+          {/* Title */}
+          <textarea
+            value={title}
+            onChange={handleTitleChange}
+            onKeyDown={handleTitleKeyDown}
+            placeholder="Sans titre"
+            rows={1}
+            className="w-full bg-transparent text-4xl font-bold tracking-tight resize-none border-none outline-none placeholder:text-muted-foreground/30 text-foreground leading-tight mb-1"
+            style={{ overflow: 'hidden' }}
+          />
 
-        <p className="text-xs text-muted-foreground mb-4">
-          Par {note.author.firstName} {note.author.lastName}
-        </p>
+          {/* Meta */}
+          <div className="flex items-center gap-3 text-sm text-muted-foreground mb-8 pb-8 border-b border-border/30">
+            <span>
+              {note.author.firstName} {note.author.lastName}
+            </span>
+            <span>
+              {new Date(note.createdAt).toLocaleDateString('fr-FR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </span>
+          </div>
 
-        {/* Rich text editor */}
-        <RichTextEditor
-          content={content}
-          onChange={handleContentChange}
-          placeholder="Commencez à documenter vos observations..."
-        />
+          {/* Rich text editor */}
+          <RichTextEditor
+            content={content}
+            onChange={handleContentChange}
+            placeholder="Tapez '/' pour les commandes..."
+          />
+        </div>
       </div>
     </div>
   );
