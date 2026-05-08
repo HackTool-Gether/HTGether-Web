@@ -1,0 +1,21 @@
+name: Security Scan (Grype)
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main  # le push sur main déclenche le déploiement Vercel
+
+jobs:
+  sca:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Run Grype SCA scan
+        uses: anchore/scan-action@v6
+        with:
+          path: "."
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
