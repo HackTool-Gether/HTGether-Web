@@ -595,15 +595,40 @@ function FloatingToolbar({ editor }: { editor: any }) {
   );
 }
 
+// --- Helpers ---
+function parseInitialContent(content: string, mode: 'html' | 'json') {
+  if (!content) return '';
+  if (mode === 'json') {
+    try {
+      const parsed = JSON.parse(content);
+      // ProseMirror JSON doc has type === 'doc'
+      if (parsed && typeof parsed === 'object' && parsed.type === 'doc') {
+        return parsed;
+      }
+      return '';
+    } catch {
+      // Not valid JSON — treat as plain text/html (legacy markdown content)
+      return content;
+    }
+  }
+  return content;
+}
+
 // --- Main editor ---
 interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  extraExtensions?: any[];
+  extraSlashItems?: SlashItem[];
+  storageMode?: 'html' | 'json';
 }
 
 export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
-  function RichTextEditor({ content, onChange, placeholder }, ref) {
+  function RichTextEditor(
+    { content, onChange, placeholder, extraExtensions = [], extraSlashItems = [], storageMode = 'html' },
+    ref,
+  ) {
     // Slash command state
     const [slashOpen, setSlashOpen] = useState(false);
     const [slashItems, setSlashItems] = useState<SlashItem[]>([]);
@@ -681,6 +706,10 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
     const callbacksRef = useRef({ onSlashStart, onSlashUpdate, onSlashExit, onSlashKeyDown });
     callbacksRef.current = { onSlashStart, onSlashUpdate, onSlashExit, onSlashKeyDown };
 
+    // Keep extra slash items fresh inside the suggestion factory closure
+    const extraSlashItemsRef = useRef(extraSlashItems);
+    extraSlashItemsRef.current = extraSlashItems;
+
     const [slashExtension] = useState(() =>
       Extension.create({
         name: 'slashCommand',
@@ -693,7 +722,8 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
                 props.command({ editor, range });
               },
               items: ({ query }: { query: string }) => {
-                return SLASH_ITEMS.filter(
+                const all = [...SLASH_ITEMS, ...(extraSlashItemsRef.current || [])];
+                return all.filter(
                   (item) =>
                     item.title.toLowerCase().includes(query.toLowerCase()) ||
                     item.description.toLowerCase().includes(query.toLowerCase()),
@@ -755,11 +785,12 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
           },
         }),
         slashExtension,
+        ...extraExtensions,
       ],
-      content,
+      content: parseInitialContent(content, storageMode),
       immediatelyRender: false,
       onUpdate: ({ editor: e }) => {
-        onChange(e.getHTML());
+        onChange(storageMode === 'json' ? JSON.stringify(e.getJSON()) : e.getHTML());
       },
       editorProps: {
         attributes: {

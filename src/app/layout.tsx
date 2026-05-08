@@ -5,7 +5,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "HTGether - Collaborative Pentest Platform",
+  title: "HTGether — Plateforme de pentest collaboratif",
   description: "Plateforme collaborative de gestion d'audits de sécurité",
 };
 
@@ -15,19 +15,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html
+      lang="fr"
+      data-theme="dark"
+      data-accent="amber"
+      data-signature="rulers"
+      className="dark"
+      suppressHydrationWarning
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  var savedTheme = localStorage.getItem('htg-theme');
-                  var isDark = savedTheme ? savedTheme === 'dark' : true;
-                  document.documentElement.classList.toggle('dark', isDark);
-                } catch (e) {
-                  document.documentElement.classList.add('dark');
-                }
+                  var el = document.documentElement;
+                  var accent = localStorage.getItem('htg-accent') || 'amber';
+                  var sig = localStorage.getItem('htg-signature') || 'rulers';
+                  if (['amber','cyan','indigo'].indexOf(accent) >= 0) el.setAttribute('data-accent', accent);
+                  if (['rulers','ticks','mono','rails','none'].indexOf(sig) >= 0) el.setAttribute('data-signature', sig);
+                  el.classList.add('dark');
+                  el.setAttribute('data-theme', 'dark');
+                } catch (e) {}
               })();
             `,
           }}

@@ -1,162 +1,391 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* =========================================================================
+   HTGether — Design tokens (dark mode primary)
+   Adapted from design/tokens.css for Tailwind v4 @theme inline
+   ========================================================================= */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Map shadcn semantic to design tokens so legacy components keep working */
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--bg-elevated);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--bg-raised);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-fg);
+  --color-secondary: var(--bg-subtle);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--bg-subtle);
+  --color-muted-foreground: var(--fg-muted);
+  --color-accent: var(--bg-subtle);
+  --color-accent-foreground: var(--fg);
+  --color-destructive: var(--sev-critical-fg);
   --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Typography scale — every entry has explicit fontSize / lineHeight / weight / tracking */
+  --text-display-size: 32px; --text-display-lh: 1.15; --text-display-weight: 600; --text-display-track: -0.02em;
+  --text-h1-size: 24px;      --text-h1-lh: 1.25;     --text-h1-weight: 600;      --text-h1-track: -0.015em;
+  --text-h2-size: 18px;      --text-h2-lh: 1.35;     --text-h2-weight: 600;      --text-h2-track: -0.01em;
+  --text-h3-size: 15px;      --text-h3-lh: 1.4;      --text-h3-weight: 600;      --text-h3-track: -0.005em;
+  --text-body-size: 14px;    --text-body-lh: 1.55;   --text-body-weight: 400;    --text-body-track: 0;
+  --text-small-size: 13px;   --text-small-lh: 1.5;   --text-small-weight: 400;   --text-small-track: 0;
+  --text-caption-size: 12px; --text-caption-lh: 1.45; --text-caption-weight: 500; --text-caption-track: 0.01em;
+  --text-code-size: 13px;    --text-code-lh: 1.55;   --text-code-weight: 400;    --text-code-track: 0;
+
+  --sp-0: 0; --sp-1: 2px; --sp-2: 4px; --sp-3: 8px; --sp-4: 12px;
+  --sp-5: 16px; --sp-6: 20px; --sp-7: 24px; --sp-8: 32px;
+  --sp-9: 40px; --sp-10: 48px; --sp-11: 64px; --sp-12: 80px;
+
+  --r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-xl: 12px; --r-full: 999px;
+
+  --dur-fast: 120ms; --dur-base: 200ms; --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-io: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --icon-sm: 14px; --icon-md: 16px; --icon-lg: 20px;
 }
 
+/* Dark palette — primary (and only well-supported) */
+:root,
+[data-theme="dark"],
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --bg: oklch(0.175 0.006 250);
+  --bg-elevated: oklch(0.205 0.006 250);
+  --bg-raised: oklch(0.235 0.007 250);
+  --bg-subtle: oklch(0.22 0.005 250);
+  --bg-input: oklch(0.195 0.005 250);
+
+  --border: oklch(0.28 0.005 250);
+  --border-strong: oklch(0.35 0.006 250);
+  --border-subtle: oklch(0.24 0.004 250);
+
+  --fg: oklch(0.97 0.003 250);
+  --fg-muted: oklch(0.72 0.005 250);
+  --fg-subtle: oklch(0.55 0.005 250);
+  --fg-disabled: oklch(0.40 0.005 250);
+
+  /* Accent — ambre (default) */
+  --accent: oklch(0.75 0.13 65);
+  --accent-hover: oklch(0.80 0.13 65);
+  --accent-fg: oklch(0.17 0.015 65);
+  --accent-tint: oklch(0.30 0.055 65 / 0.35);
+  --accent-ring: oklch(0.75 0.13 65 / 0.35);
+
+  /* Severities */
+  --sev-critical-fg: oklch(0.78 0.16 15);
+  --sev-critical-bg: oklch(0.35 0.09 15 / 0.30);
+  --sev-critical-br: oklch(0.50 0.12 15 / 0.50);
+  --sev-high-fg: oklch(0.78 0.14 35);
+  --sev-high-bg: oklch(0.35 0.08 35 / 0.30);
+  --sev-high-br: oklch(0.50 0.11 35 / 0.50);
+  --sev-medium-fg: oklch(0.80 0.13 75);
+  --sev-medium-bg: oklch(0.34 0.07 75 / 0.30);
+  --sev-medium-br: oklch(0.50 0.10 75 / 0.50);
+  --sev-low-fg: oklch(0.78 0.11 195);
+  --sev-low-bg: oklch(0.32 0.06 210 / 0.30);
+  --sev-low-br: oklch(0.50 0.08 210 / 0.50);
+  --sev-info-fg: oklch(0.75 0.02 250);
+  --sev-info-bg: oklch(0.30 0.01 250 / 0.50);
+  --sev-info-br: oklch(0.40 0.01 250 / 0.60);
+
+  /* Component status */
+  --st-compliant-fg: oklch(0.78 0.13 155);
+  --st-compliant-bg: oklch(0.32 0.07 155 / 0.30);
+  --st-compliant-br: oklch(0.48 0.10 155 / 0.50);
+  --st-remark-fg: oklch(0.80 0.13 75);
+  --st-remark-bg: oklch(0.34 0.07 75 / 0.30);
+  --st-remark-br: oklch(0.50 0.10 75 / 0.50);
+  --st-vulnerable-fg: oklch(0.78 0.16 15);
+  --st-vulnerable-bg: oklch(0.35 0.09 15 / 0.30);
+  --st-vulnerable-br: oklch(0.50 0.12 15 / 0.50);
+  --st-untested-fg: oklch(0.62 0.01 250);
+  --st-untested-bg: oklch(0.28 0.005 250 / 0.50);
+  --st-untested-br: oklch(0.38 0.005 250 / 0.60);
+
+  /* Presence colors (rotate for users) */
+  --pr-1: oklch(0.72 0.14 30);
+  --pr-2: oklch(0.75 0.13 155);
+  --pr-3: oklch(0.72 0.14 260);
+  --pr-4: oklch(0.76 0.13 195);
+  --pr-5: oklch(0.74 0.15 320);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 0 0 oklch(0 0 0 / 0.3), 0 0 0 1px oklch(1 0 0 / 0.03);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.04);
+  --shadow-lg: 0 16px 40px -8px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.05);
+  --shadow-focus: 0 0 0 3px var(--accent-ring);
+
+  --sig-line: oklch(0.32 0.005 250);
+  --sig-line-strong: oklch(0.42 0.005 250);
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
+/* Accent presets */
+[data-accent="amber"] {
+  --accent: oklch(0.75 0.13 65);
+  --accent-hover: oklch(0.80 0.13 65);
+  --accent-fg: oklch(0.17 0.015 65);
+  --accent-tint: oklch(0.30 0.055 65 / 0.35);
+  --accent-ring: oklch(0.75 0.13 65 / 0.35);
+}
+[data-accent="cyan"] {
+  --accent: oklch(0.72 0.11 200);
+  --accent-hover: oklch(0.78 0.11 200);
+  --accent-fg: oklch(0.15 0.02 200);
+  --accent-tint: oklch(0.30 0.06 200 / 0.35);
+  --accent-ring: oklch(0.72 0.11 200 / 0.35);
+}
+[data-accent="indigo"] {
+  --accent: oklch(0.64 0.15 265);
+  --accent-hover: oklch(0.70 0.15 265);
+  --accent-fg: oklch(0.97 0.005 265);
+  --accent-tint: oklch(0.32 0.08 265 / 0.35);
+  --accent-ring: oklch(0.64 0.15 265 / 0.35);
 }
 
-/* ===== Notion-style TipTap editor ===== */
+/* Signature gestures */
+.sig-surface { background: none; }
 
-/* Editor wrapper */
-.notion-editor-wrapper {
-  position: relative;
+[data-signature="rulers"] .sig-surface {
+  background-image: linear-gradient(to bottom, transparent 0, transparent 159px, var(--sig-line) 159px, var(--sig-line) 160px);
+  background-size: 100% 160px;
+  background-attachment: local;
 }
 
-/* Main editor area */
+[data-signature="ticks"] .sig-card { position: relative; }
+[data-signature="ticks"] .sig-card::before,
+[data-signature="ticks"] .sig-card::after {
+  content: "";
+  position: absolute;
+  width: 8px; height: 8px;
+  pointer-events: none;
+  opacity: 0.55;
+}
+[data-signature="ticks"] .sig-card::before {
+  top: -1px; left: -1px;
+  border-top: 1px solid var(--accent);
+  border-left: 1px solid var(--accent);
+}
+[data-signature="ticks"] .sig-card::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+}
+
+[data-signature="mono"] .sig-title::before {
+  content: attr(data-prefix) " ";
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 0.85em;
+  letter-spacing: 0.05em;
+  margin-right: 8px;
+  opacity: 0.9;
+}
+
+[data-signature="rails"] .sig-card { position: relative; padding-left: 14px; }
+[data-signature="rails"] .sig-card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0.6;
+  border-radius: 0 2px 2px 0;
+}
+
+[data-signature="none"] .sig-surface { background: none; }
+
+/* =========================================================================
+   Base + utilities
+   ========================================================================= */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-lh);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-radius: var(--r-md);
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: oklch(0.30 0.005 250);
+  border-radius: var(--r-full);
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: oklch(0.38 0.005 250); }
+
+.mono { font-family: var(--font-mono); font-feature-settings: "ss02"; }
+.cap {
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-lh);
+  font-weight: var(--text-caption-weight);
+  letter-spacing: var(--text-caption-track);
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.muted { color: var(--fg-muted); }
+.subtle { color: var(--fg-subtle); }
+
+/* Badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: var(--r-sm);
+  border: 1px solid;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+.badge-critical { color: var(--sev-critical-fg); background: var(--sev-critical-bg); border-color: var(--sev-critical-br); }
+.badge-high     { color: var(--sev-high-fg);     background: var(--sev-high-bg);     border-color: var(--sev-high-br); }
+.badge-medium   { color: var(--sev-medium-fg);   background: var(--sev-medium-bg);   border-color: var(--sev-medium-br); }
+.badge-low      { color: var(--sev-low-fg);      background: var(--sev-low-bg);      border-color: var(--sev-low-br); }
+.badge-info     { color: var(--sev-info-fg);     background: var(--sev-info-bg);     border-color: var(--sev-info-br); }
+.badge-compliant  { color: var(--st-compliant-fg); background: var(--st-compliant-bg); border-color: var(--st-compliant-br); }
+.badge-remark     { color: var(--st-remark-fg); background: var(--st-remark-bg); border-color: var(--st-remark-br); }
+.badge-vulnerable { color: var(--st-vulnerable-fg); background: var(--st-vulnerable-bg); border-color: var(--st-vulnerable-br); }
+.badge-untested   { color: var(--st-untested-fg); background: var(--st-untested-bg); border-color: var(--st-untested-br); }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px;
+  font-size: 13px; font-weight: 500;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  user-select: none;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btn:hover { background: var(--bg-raised); border-color: var(--border-strong); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+.btn-primary:hover { background: var(--accent-hover); border-color: transparent; }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--fg-muted); }
+.btn-ghost:hover { background: var(--bg-subtle); color: var(--fg); border-color: transparent; }
+.btn-sm { padding: 4px 8px; font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Inputs */
+.input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-input);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
+.input::placeholder { color: var(--fg-subtle); }
+
+/* Kbd */
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--r-sm);
+  line-height: 1;
+}
+
+/* Avatar */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: var(--r-sm);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: white;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+.avatar-lg { width: 28px; height: 28px; font-size: 12px; border-radius: var(--r-md); }
+
+/* Severity rail */
+.sev-rail {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 2px;
+  border-radius: 2px 0 0 2px;
+}
+.sev-rail-critical { background: var(--sev-critical-fg); }
+.sev-rail-high     { background: var(--sev-high-fg); }
+.sev-rail-medium   { background: var(--sev-medium-fg); }
+.sev-rail-low      { background: var(--sev-low-fg); }
+.sev-rail-info     { background: var(--sev-info-fg); }
+
+/* Card */
+.card-htg {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.hr { height: 1px; background: var(--border-subtle); border: 0; }
+
+/* Animations for command palette + modals */
+@keyframes htgFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes htgScaleIn { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* =========================================================================
+   Legacy: TipTap notion-editor styles (kept for the existing note editor)
+   ========================================================================= */
+.notion-editor-wrapper { position: relative; }
+
 .notion-editor {
   outline: none;
   font-size: 1rem;
   line-height: 1.75;
-  color: var(--foreground);
-  caret-color: var(--foreground);
+  color: var(--fg);
+  caret-color: var(--fg);
   min-height: 60vh;
 }
 
-/* Placeholder */
-.notion-editor p.is-empty::before {
-  color: var(--muted-foreground);
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-  opacity: 0.5;
-}
-
+.notion-editor p.is-empty::before,
 .notion-editor .is-editor-empty:first-child::before {
-  color: var(--muted-foreground);
+  color: var(--fg-muted);
   content: attr(data-placeholder);
   float: left;
   height: 0;
@@ -164,399 +393,145 @@
   opacity: 0.5;
 }
 
-/* Headings - Notion style */
-.notion-editor h1 {
-  font-size: 1.875rem;
-  font-weight: 700;
-  margin-top: 2rem;
-  margin-bottom: 0.25rem;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-}
+.notion-editor h1 { font-size: 1.875rem; font-weight: 700; margin-top: 2rem; margin-bottom: 0.25rem; line-height: 1.3; letter-spacing: -0.02em; }
+.notion-editor h2 { font-size: 1.5rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.25rem; line-height: 1.35; letter-spacing: -0.01em; }
+.notion-editor h3 { font-size: 1.25rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.25rem; line-height: 1.4; }
+.notion-editor p { margin: 0.125rem 0; }
+.notion-editor ul { list-style-type: disc; padding-left: 1.625rem; margin: 0.25rem 0; }
+.notion-editor ol { list-style-type: decimal; padding-left: 1.625rem; margin: 0.25rem 0; }
+.notion-editor li { margin: 0.125rem 0; }
+.notion-editor li p { margin: 0; }
 
-.notion-editor h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-top: 1.5rem;
-  margin-bottom: 0.25rem;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-}
-
-.notion-editor h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-top: 1.25rem;
-  margin-bottom: 0.25rem;
-  line-height: 1.4;
-}
-
-/* Paragraphs */
-.notion-editor p {
-  margin: 0.125rem 0;
-}
-
-/* Lists */
-.notion-editor ul {
-  list-style-type: disc;
-  padding-left: 1.625rem;
-  margin: 0.25rem 0;
-}
-
-.notion-editor ol {
-  list-style-type: decimal;
-  padding-left: 1.625rem;
-  margin: 0.25rem 0;
-}
-
-.notion-editor li {
-  margin: 0.125rem 0;
-}
-
-.notion-editor li p {
-  margin: 0;
-}
-
-/* Task list (todo) - Notion style */
-.notion-editor ul[data-type="taskList"] {
-  list-style: none;
-  padding-left: 0;
-  margin: 0.25rem 0;
-}
-
-.notion-editor ul[data-type="taskList"] li {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin: 0.125rem 0;
-}
-
-.notion-editor ul[data-type="taskList"] li > label {
-  flex-shrink: 0;
-  margin-top: 0.25rem;
-  display: flex;
-  align-items: center;
-}
-
+.notion-editor ul[data-type="taskList"] { list-style: none; padding-left: 0; margin: 0.25rem 0; }
+.notion-editor ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.125rem 0; }
+.notion-editor ul[data-type="taskList"] li > label { flex-shrink: 0; margin-top: 0.25rem; display: flex; align-items: center; }
 .notion-editor ul[data-type="taskList"] li > label input[type="checkbox"] {
-  appearance: none;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid var(--border);
-  border-radius: 0.25rem;
-  background: transparent;
-  cursor: pointer;
-  position: relative;
+  appearance: none; width: 1rem; height: 1rem;
+  border: 2px solid var(--border); border-radius: 0.25rem;
+  background: transparent; cursor: pointer; position: relative;
   transition: all 0.15s ease;
 }
-
-.notion-editor ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
-  border-color: var(--primary);
-  background: var(--primary)/10;
-}
-
-.notion-editor ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
+.notion-editor ul[data-type="taskList"] li > label input[type="checkbox"]:hover { border-color: var(--accent); }
+.notion-editor ul[data-type="taskList"] li > label input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
 .notion-editor ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 0px;
-  width: 5px;
-  height: 9px;
-  border: solid var(--primary-foreground);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  content: ''; position: absolute; left: 3px; top: 0px; width: 5px; height: 9px;
+  border: solid var(--accent-fg); border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
+.notion-editor ul[data-type="taskList"] li[data-checked="true"] > div > p { text-decoration: line-through; color: var(--fg-muted); }
+.notion-editor ul[data-type="taskList"] li > div { flex: 1; }
 
-.notion-editor ul[data-type="taskList"] li[data-checked="true"] > div > p {
-  text-decoration: line-through;
-  color: var(--muted-foreground);
-}
+.notion-editor blockquote { border-left: 3px solid var(--fg); padding-left: 1rem; margin: 0.75rem 0; }
+.notion-editor code { background: var(--bg-input); color: var(--sev-high-fg); padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.875em; font-family: var(--font-mono); }
+.notion-editor pre { background: var(--bg-input); color: var(--fg); padding: 1rem 1.25rem; border-radius: 0.5rem; margin: 0.75rem 0; overflow-x: auto; font-family: var(--font-mono); font-size: 0.875em; line-height: 1.7; border: 1px solid var(--border); }
+.notion-editor pre code { background: none; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
+.notion-editor a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.notion-editor hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+.notion-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1rem 0; }
+.notion-editor table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; table-layout: fixed; }
+.notion-editor th, .notion-editor td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; min-width: 80px; font-size: 0.875rem; line-height: 1.5; }
+.notion-editor th { background: var(--bg-subtle); font-weight: 600; font-size: 0.8125rem; color: var(--fg-muted); }
 
-.notion-editor ul[data-type="taskList"] li > div {
-  flex: 1;
-}
+.bubble-menu { display: flex; align-items: center; gap: 0.125rem; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.25rem; box-shadow: var(--shadow-md); }
+.bubble-sep { width: 1px; height: 1.25rem; background: var(--border); margin: 0 0.125rem; }
 
-/* Blockquote - Notion style */
-.notion-editor blockquote {
-  border-left: 3px solid var(--foreground);
-  padding-left: 1rem;
-  margin: 0.75rem 0;
-  color: var(--foreground);
-}
+.slash-menu { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.375rem; box-shadow: var(--shadow-md); max-height: 320px; overflow-y: auto; width: 280px; }
+.slash-menu-item { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.5rem 0.625rem; border-radius: var(--r-md); border: none; background: none; cursor: pointer; text-align: left; transition: background-color 0.1s ease; color: var(--fg); }
+.slash-menu-item:hover, .slash-menu-item.is-selected { background: var(--bg-subtle); }
+.slash-menu-icon { display: flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border-radius: var(--r-md); background: var(--bg-input); flex-shrink: 0; color: var(--fg); }
+.slash-menu-text { display: flex; flex-direction: column; gap: 0.0625rem; min-width: 0; }
+.slash-menu-title { font-size: 0.875rem; font-weight: 500; line-height: 1.3; }
+.slash-menu-desc { font-size: 0.75rem; color: var(--fg-muted); line-height: 1.3; }
 
-/* Inline code */
-.notion-editor code {
-  background: var(--muted);
-  color: oklch(0.65 0.2 15);
-  padding: 0.15rem 0.4rem;
-  border-radius: 0.25rem;
-  font-size: 0.875em;
+.block-handle { display: flex; align-items: center; gap: 0.125rem; height: 1.75rem; }
+.block-handle-btn { display: flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: var(--r-sm); border: none; background: none; color: var(--fg-muted); cursor: pointer; opacity: 0.5; }
+.block-handle-btn:hover { background: var(--bg-subtle); color: var(--fg); opacity: 1; }
+.block-handle-grip { cursor: grab; }
+.block-handle-grip:active { cursor: grabbing; }
+
+/* ===== Report editor: variables + findings table ===== */
+.report-variable {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklch, var(--accent) 18%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in oklch, var(--accent) 35%, transparent);
   font-family: var(--font-mono);
+  font-size: 0.85em;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: default;
+  user-select: all;
+}
+.report-variable.is-unknown {
+  background: color-mix(in oklch, var(--sev-high-fg) 15%, transparent);
+  color: var(--sev-high-fg);
+  border-color: color-mix(in oklch, var(--sev-high-fg) 35%, transparent);
+}
+.ProseMirror-selectednode .report-variable {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
-.dark .notion-editor code {
-  color: oklch(0.8 0.15 15);
-}
-
-/* Code block */
-.notion-editor pre {
-  background: oklch(0.16 0 0);
-  color: oklch(0.9 0 0);
-  padding: 1rem 1.25rem;
-  border-radius: 0.5rem;
-  margin: 0.75rem 0;
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: 0.875em;
-  line-height: 1.7;
-  border: 1px solid var(--border);
-}
-
-.notion-editor pre code {
-  background: none;
-  color: inherit;
-  padding: 0;
-  border-radius: 0;
-  font-size: inherit;
-}
-
-/* Links */
-.notion-editor .notion-link,
-.notion-editor a {
-  color: var(--foreground);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--muted-foreground);
-  cursor: pointer;
-  transition: text-decoration-color 0.15s ease;
-}
-
-.notion-editor .notion-link:hover,
-.notion-editor a:hover {
-  text-decoration-color: var(--foreground);
-}
-
-/* Horizontal rule */
-.notion-editor hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 1.5rem 0;
-}
-
-/* Images */
-.notion-editor .notion-image,
-.notion-editor img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 0.5rem;
+.report-findings-table-wrapper {
   margin: 1rem 0;
-}
-
-/* Table - Notion style */
-.notion-editor .notion-table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 0.75rem 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   overflow: hidden;
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
+  background: var(--bg-subtle);
 }
-
-.notion-editor table {
+.report-findings-table {
+  width: 100%;
   border-collapse: collapse;
-  width: 100%;
-  margin: 0.75rem 0;
-  table-layout: fixed;
-  overflow: hidden;
-}
-
-.notion-editor th,
-.notion-editor td {
-  border: 1px solid var(--border);
-  padding: 0.5rem 0.75rem;
-  text-align: left;
-  vertical-align: top;
-  position: relative;
-  min-width: 80px;
   font-size: 0.875rem;
-  line-height: 1.5;
 }
-
-.notion-editor th {
-  background: var(--muted);
-  font-weight: 600;
-  font-size: 0.8125rem;
-  text-transform: none;
-  color: var(--muted-foreground);
-}
-
-.notion-editor td {
-  background: transparent;
-}
-
-/* Selected cell */
-.notion-editor .selectedCell::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: oklch(0.55 0.25 265 / 12%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Column resize handle */
-.notion-editor .column-resize-handle {
-  position: absolute;
-  right: -2px;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--primary);
-  cursor: col-resize;
-  z-index: 10;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.notion-editor table:hover .column-resize-handle {
-  opacity: 0.5;
-}
-
-.notion-editor .column-resize-handle:hover {
-  opacity: 1 !important;
-}
-
-.notion-editor .tableWrapper {
-  overflow-x: auto;
-  margin: 0.75rem 0;
-}
-
-/* Paragraph inside table cells */
-.notion-editor th p,
-.notion-editor td p {
-  margin: 0;
-}
-
-/* ===== Bubble menu (floating toolbar on selection) ===== */
-.bubble-menu {
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-  background: oklch(0.2 0 0);
-  border: 1px solid oklch(0.3 0 0);
-  border-radius: 0.5rem;
-  padding: 0.25rem;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-}
-
-.bubble-sep {
-  width: 1px;
-  height: 1.25rem;
-  background: oklch(0.35 0 0);
-  margin: 0 0.125rem;
-}
-
-/* ===== Slash command menu ===== */
-.slash-menu {
-  background: var(--popover);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  padding: 0.375rem;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
-  max-height: 320px;
-  overflow-y: auto;
-  width: 280px;
-}
-
-.slash-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.5rem 0.625rem;
-  border-radius: 0.5rem;
-  border: none;
-  background: none;
-  cursor: pointer;
+.report-findings-table th {
   text-align: left;
-  transition: background-color 0.1s ease;
-  color: var(--foreground);
-}
-
-.slash-menu-item:hover,
-.slash-menu-item.is-selected {
-  background: var(--accent);
-}
-
-.slash-menu-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.375rem;
-  background: var(--muted);
-  flex-shrink: 0;
-  color: var(--foreground);
-}
-
-.slash-menu-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.0625rem;
-  min-width: 0;
-}
-
-.slash-menu-title {
-  font-size: 0.875rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--bg-input);
+  border-bottom: 1px solid var(--border);
   font-weight: 500;
-  line-height: 1.3;
-}
-
-.slash-menu-desc {
+  color: var(--fg-muted);
   font-size: 0.75rem;
-  color: var(--muted-foreground);
-  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.report-findings-table td {
+  padding: 0.625rem 0.875rem;
+  border-top: 1px solid var(--border);
+  color: var(--fg);
+  vertical-align: top;
+}
+.report-findings-table tr:first-child td { border-top: none; }
+.report-findings-table-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+.ProseMirror-selectednode .report-findings-table-wrapper {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-/* ===== Block handle (Notion-style + and grip) ===== */
-.block-handle {
-  display: flex;
+.sev-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 0.125rem;
-  height: 1.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid currentColor;
 }
+.sev-badge.sev-critical { color: var(--sev-critical-fg); background: color-mix(in oklch, var(--sev-critical-fg) 15%, transparent); }
+.sev-badge.sev-high { color: var(--sev-high-fg); background: color-mix(in oklch, var(--sev-high-fg) 15%, transparent); }
+.sev-badge.sev-medium { color: var(--sev-medium-fg); background: color-mix(in oklch, var(--sev-medium-fg) 15%, transparent); }
+.sev-badge.sev-low { color: var(--sev-low-fg); background: color-mix(in oklch, var(--sev-low-fg) 15%, transparent); }
+.sev-badge.sev-info { color: var(--sev-info-fg); background: color-mix(in oklch, var(--sev-info-fg) 15%, transparent); }
 
-.block-handle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 0.25rem;
-  border: none;
-  background: none;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  transition: background-color 0.1s ease, color 0.1s ease;
-  opacity: 0.5;
-}
-
-.block-handle-btn:hover {
-  background: var(--accent);
-  color: var(--foreground);
-  opacity: 1;
-}
-
-.block-handle-grip {
-  cursor: grab;
-}
-
-.block-handle-grip:active {
-  cursor: grabbing;
+@layer base {
+  body { background: var(--bg); color: var(--fg); }
 }

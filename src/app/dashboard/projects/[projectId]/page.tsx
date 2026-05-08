@@ -2,49 +2,62 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { Topbar } from '@/components/shell/topbar';
+import { Avatar, AvatarStack } from '@/components/shell/avatar';
+import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
-import { projectsApi, scopesApi, ApiError } from '@/lib/api';
-import type { ProjectDetail, Scope } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { projectsApi, scopesApi, ApiError, type ProjectDetail, type Scope, type ScopeStatus } from '@/lib/api';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  ArrowLeft,
   Plus,
-  Loader2,
-  AlertCircle,
-  FileText,
-  Target,
-  Users,
-  Calendar,
   X,
+  Loader2,
+  FileText,
+  Bug,
+  Target,
   Trash2,
+  ArrowRight,
 } from 'lucide-react';
-
-const SCOPE_STATUS: Record<string, { label: string; color: string }> = {
-  NOT_STARTED: { label: 'Non démarré', color: 'bg-muted text-muted-foreground' },
-  IN_PROGRESS: { label: 'En cours', color: 'bg-blue-500/10 text-blue-600' },
-  COMPLETED: { label: 'Terminé', color: 'bg-green-500/10 text-green-600' },
-  IN_REVIEW: { label: 'En revue', color: 'bg-yellow-500/10 text-yellow-600' },
-};
 
 const AUDIT_LABELS: Record<string, string> = {
   WEB: 'Web', INTERNAL_AD: 'Active Directory', LINUX: 'Linux', MOBILE: 'Mobile', OTHER: 'Autre',
 };
+
+const SCOPE_BADGE: Record<ScopeStatus, string> = {
+  NOT_STARTED: 'untested',
+  IN_PROGRESS: 'remark',
+  COMPLETED: 'compliant',
+  IN_REVIEW: 'remark',
+};
+
+const SCOPE_LABEL: Record<ScopeStatus, string> = {
+  NOT_STARTED: 'à démarrer',
+  IN_PROGRESS: 'en cours',
+  COMPLETED: 'terminé',
+  IN_REVIEW: 'en revue',
+};
+
+const STATUS_PHASE: Record<string, string> = {
+  DRAFT: 'Cadrage',
+  IN_PROGRESS: 'Exécution',
+  IN_REVIEW: 'Revue',
+  DELIVERED: 'Livré',
+  ARCHIVED: 'Archivé',
+};
+
+function progressPercent(p: ProjectDetail): number {
+  const start = new Date(p.startDate).getTime();
+  const end = new Date(p.endDate).getTime();
+  const now = Date.now();
+  if (!start || !end || end <= start) return 0;
+  return Math.max(0, Math.min(100, Math.round(((now - start) / (end - start)) * 100)));
+}
 
 export default function ProjectDetailPage() {
   const { token } = useAuth();
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
+  const { setActiveProject } = useShell();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +80,18 @@ export default function ProjectDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Sync active project with sidebar
+  useEffect(() => {
+    if (project) {
+      setActiveProject({
+        id: project.id,
+        slug: project.name,
+        scopesCount: project.scopes?.length,
+      });
+    }
+    return () => setActiveProject(null);
+  }, [project, setActiveProject]);
+
   const handleAddScope = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -86,6 +111,7 @@ export default function ProjectDetailPage() {
 
   const handleDeleteScope = async (scopeId: string) => {
     if (!token) return;
+    if (!confirm('Supprimer ce scope ?')) return;
     try {
       await scopesApi.remove(projectId, scopeId, token);
       load();
@@ -96,179 +122,381 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <>
+        <Topbar crumbs={[{ label: 'Projets' }, { label: '…' }]} />
+        <div style={{ padding: 40, color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Chargement…
+        </div>
+      </>
     );
   }
 
   if (!project) {
     return (
-      <div className="p-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>Projet introuvable</AlertDescription>
-        </Alert>
-      </div>
+      <>
+        <Topbar crumbs={[{ label: 'Projets' }, { label: 'Introuvable' }]} />
+        <div style={{ padding: 40, color: 'var(--sev-critical-fg)' }}>Projet introuvable.</div>
+      </>
     );
   }
 
-  return (
-    <div className="p-8 max-w-5xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Button variant="ghost" size="sm" className="mb-4" onClick={() => router.push('/dashboard/projects')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Projets
-        </Button>
+  const team = (project.members || []).map((m) => ({
+    id: m.user.id,
+    name: `${m.user.firstName} ${m.user.lastName}`,
+  }));
+  const progress = progressPercent(project);
 
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{project.name}</h1>
-            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Target className="h-4 w-4" />
-                {AUDIT_LABELS[project.auditType] || project.auditType}
-              </span>
-              <span className="flex items-center gap-1">
-                <Users className="h-4 w-4" />
-                {project.members.length} membre(s)
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
+  return (
+    <>
+      <Topbar
+        crumbs={[
+          { label: 'Projets' },
+          { label: project.name, mono: true },
+        ]}
+        presence={team.slice(0, 3)}
+        actions={
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => router.push(`/dashboard/projects/${projectId}/findings`)}
+          >
+            <Bug size={12} /> Findings
+          </button>
+        }
+      />
+
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }} className="sig-surface">
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 32px' }}>
+          {/* Hero */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              className="mono"
+              style={{
+                fontSize: 11,
+                color: 'var(--fg-subtle)',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                marginBottom: 6,
+              }}
+            >
+              {project.clientCompany} · {AUDIT_LABELS[project.auditType]}
+            </div>
+            <h1
+              style={{
+                fontSize: 'var(--text-h1-size)',
+                lineHeight: 'var(--text-h1-lh)',
+                fontWeight: 600,
+                letterSpacing: 'var(--text-h1-track)',
+                margin: 0,
+              }}
+            >
+              {project.name}
+            </h1>
+            <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 12.5, color: 'var(--fg-muted)' }}>
+              <span className="mono">
                 {new Date(project.startDate).toLocaleDateString('fr-FR')} — {new Date(project.endDate).toLocaleDateString('fr-FR')}
               </span>
+              <span style={{ textTransform: 'capitalize' }}>{STATUS_PHASE[project.status]}</span>
+            </div>
+
+            {/* Progress bar */}
+            <div style={{ marginTop: 14 }}>
+              <div
+                style={{
+                  height: 4,
+                  background: 'var(--bg-input)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${progress}%`,
+                    background: 'var(--accent)',
+                    transition: 'width 200ms ease-out',
+                  }}
+                />
+              </div>
+              <div
+                className="mono"
+                style={{
+                  fontSize: 10.5,
+                  color: 'var(--fg-subtle)',
+                  marginTop: 4,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>jour {Math.round((progress / 100) * Math.max(1, durationDays(project)))} / {durationDays(project)}</span>
+                <span>{progress}%</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Project info */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Client</p>
-              <p className="text-sm font-medium">{project.clientCompany}</p>
-              <p className="text-xs text-muted-foreground mt-1">{project.clientNeed}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Contexte</p>
-              <p className="text-sm">{project.context}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+          {error && (
+            <div
+              style={{
+                marginBottom: 16,
+                padding: '10px 12px',
+                fontSize: 13,
+                color: 'var(--sev-critical-fg)',
+                background: 'var(--sev-critical-bg)',
+                border: '1px solid var(--sev-critical-br)',
+                borderRadius: 'var(--r-md)',
+              }}
+            >
+              {error}
+            </div>
+          )}
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Scopes section */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">Scopes</h2>
-          <Button size="sm" onClick={() => setShowAddScope(true)}>
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            Ajouter un scope
-          </Button>
-        </div>
-
-        {showAddScope && (
-          <Card className="mb-4">
-            <CardContent className="pt-4">
-              <form onSubmit={handleAddScope} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nom du scope</Label>
-                    <Input
-                      value={scopeForm.name}
-                      onChange={(e) => setScopeForm({ ...scopeForm, name: e.target.value })}
-                      placeholder="ex: Application Web, API REST..."
-                      required
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Description (optionnel)</Label>
-                    <Input
-                      value={scopeForm.description}
-                      onChange={(e) => setScopeForm({ ...scopeForm, description: e.target.value })}
-                      placeholder="Périmètre de test..."
-                      className="h-8 text-sm"
-                    />
-                  </div>
+          {/* Grid 12 cols */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+            {/* Left column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Cadrage */}
+              <div className="card-htg sig-card" style={{ padding: 16 }}>
+                <div className="cap" style={{ marginBottom: 10 }}>Cadrage</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <Block label="Besoin client" value={project.clientNeed} />
+                  <Block label="Contexte" value={project.context} />
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddScope(false)}>
-                    <X className="mr-1 h-3.5 w-3.5" /> Annuler
-                  </Button>
-                  <Button type="submit" size="sm" disabled={creating}>
-                    {creating && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-                    Ajouter
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+              </div>
 
-        {project.scopes.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <Target className="h-10 w-10 text-muted-foreground/50 mb-3" />
-              <p className="text-sm font-medium">Aucun scope</p>
-              <p className="text-xs text-muted-foreground">Ajoutez un périmètre de test pour commencer</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {project.scopes.map((scope: Scope & { _count?: { notes: number; components: number } }) => {
-              const status = SCOPE_STATUS[scope.status] || SCOPE_STATUS.NOT_STARTED;
-              return (
-                <Card
-                  key={scope.id}
-                  className="cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => router.push(`/dashboard/projects/${projectId}/scopes/${scope.id}`)}
+              {/* Scopes */}
+              <div className="card-htg sig-card" style={{ overflow: 'hidden' }}>
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
                 >
-                  <CardContent className="flex items-center justify-between py-4">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="font-medium text-sm">{scope.name}</p>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                    Périmètres
+                    <span className="mono" style={{ color: 'var(--fg-subtle)', marginLeft: 6, fontWeight: 400 }}>
+                      {project.scopes?.length || 0}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{ marginLeft: 'auto' }}
+                    onClick={() => setShowAddScope(true)}
+                  >
+                    <Plus size={12} /> Nouveau
+                  </button>
+                </div>
+
+                {showAddScope && (
+                  <form onSubmit={handleAddScope} style={{ padding: 16, borderBottom: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                      <input
+                        className="input"
+                        placeholder="Nom (ex: Application Web)"
+                        value={scopeForm.name}
+                        onChange={(e) => setScopeForm({ ...scopeForm, name: e.target.value })}
+                        required
+                      />
+                      <input
+                        className="input"
+                        placeholder="Description (optionnelle)"
+                        value={scopeForm.description}
+                        onChange={(e) => setScopeForm({ ...scopeForm, description: e.target.value })}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      <button type="button" className="btn btn-sm" onClick={() => setShowAddScope(false)}>
+                        <X size={12} /> Annuler
+                      </button>
+                      <button type="submit" className="btn btn-primary btn-sm" disabled={creating}>
+                        {creating && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />}
+                        Ajouter
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {(!project.scopes || project.scopes.length === 0) ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>
+                    <Target size={20} style={{ marginBottom: 8, color: 'var(--fg-subtle)' }} />
+                    <div>Aucun périmètre. Ajoutez-en pour démarrer le test.</div>
+                  </div>
+                ) : (
+                  project.scopes.map((scope: Scope, i, arr) => (
+                    <div
+                      key={scope.id}
+                      onClick={() => router.push(`/dashboard/projects/${projectId}/scopes/${scope.id}`)}
+                      style={{
+                        padding: '12px 16px',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto auto auto',
+                        gap: 14,
+                        alignItems: 'center',
+                        borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                      }}
+                      onMouseEnter={(e) =>
+                        ((e.currentTarget as HTMLDivElement).style.background = 'var(--bg-subtle)')
+                      }
+                      onMouseLeave={(e) =>
+                        ((e.currentTarget as HTMLDivElement).style.background = 'transparent')
+                      }
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div className="mono" style={{ fontSize: 13, fontWeight: 500 }}>{scope.name}</div>
                         {scope.description && (
-                          <p className="text-xs text-muted-foreground">{scope.description}</p>
+                          <div
+                            style={{
+                              fontSize: 11.5,
+                              color: 'var(--fg-subtle)',
+                              marginTop: 2,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {scope.description}
+                          </div>
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <FileText className="h-3.5 w-3.5" />
-                        {scope._count?.notes || 0} notes
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontSize: 11.5,
+                          color: 'var(--fg-muted)',
+                        }}
+                      >
+                        <FileText size={12} style={{ color: 'var(--fg-subtle)' }} />
+                        {scope._count?.notes ?? 0}
                       </span>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.color}`}>
-                        {status.label}
+                      <span className={`badge badge-${SCOPE_BADGE[scope.status]}`}>
+                        {SCOPE_LABEL[scope.status]}
                       </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
+                      <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteScope(scope.id);
                         }}
+                        className="btn btn-ghost btn-sm"
+                        title="Supprimer"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                        <Trash2 size={12} />
+                      </button>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Right column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Team */}
+              <div className="card-htg sig-card" style={{ padding: 16 }}>
+                <div className="cap" style={{ marginBottom: 10 }}>Équipe ({project.members?.length || 0})</div>
+                {(!project.members || project.members.length === 0) ? (
+                  <div style={{ fontSize: 12.5, color: 'var(--fg-subtle)' }}>Aucun membre.</div>
+                ) : (
+                  project.members.map((m) => (
+                    <div
+                      key={m.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '6px 0',
+                        fontSize: 13,
+                      }}
+                    >
+                      <Avatar
+                        user={{
+                          id: m.user.id,
+                          name: `${m.user.firstName} ${m.user.lastName}`,
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 500 }}>
+                          {m.user.firstName} {m.user.lastName}
+                        </div>
+                        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>
+                          {m.role.toLowerCase()}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Quick links */}
+              <div className="card-htg sig-card" style={{ padding: 16 }}>
+                <div className="cap" style={{ marginBottom: 10 }}>Vues</div>
+                {[
+                  { label: 'Findings', icon: Bug, href: `/dashboard/projects/${projectId}/findings` },
+                  { label: 'Rapport', icon: FileText, href: `/dashboard/projects/${projectId}/report` },
+                ].map((l) => {
+                  const I = l.icon;
+                  return (
+                    <button
+                      key={l.label}
+                      type="button"
+                      onClick={() => router.push(l.href)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        width: '100%',
+                        padding: '8px 10px',
+                        background: 'transparent',
+                        border: '1px solid transparent',
+                        borderRadius: 'var(--r-md)',
+                        color: 'var(--fg)',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-subtle)';
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-subtle)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent';
+                      }}
+                    >
+                      <I size={14} strokeWidth={1.75} style={{ color: 'var(--fg-muted)' }} />
+                      <span style={{ flex: 1 }}>{l.label}</span>
+                      <ArrowRight size={12} style={{ color: 'var(--fg-subtle)' }} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function durationDays(p: ProjectDetail): number {
+  const start = new Date(p.startDate).getTime();
+  const end = new Date(p.endDate).getTime();
+  if (!start || !end) return 0;
+  return Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+}
+
+function Block({ label, value }: { label: string; value?: string }) {
+  return (
+    <div>
+      <div className="cap" style={{ marginBottom: 4, fontSize: 10.5 }}>{label}</div>
+      <div style={{ fontSize: 13, color: 'var(--fg)', lineHeight: 1.5 }}>
+        {value || <span style={{ color: 'var(--fg-subtle)' }}>—</span>}
       </div>
     </div>
   );

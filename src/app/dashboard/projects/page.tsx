@@ -1,39 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Topbar } from '@/components/shell/topbar';
+import { AvatarStack } from '@/components/shell/avatar';
 import { useAuth } from '@/lib/auth-context';
-import { projectsApi, ApiError } from '@/lib/api';
-import type { Project, AuditType } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Plus,
-  FolderOpen,
-  Loader2,
-  AlertCircle,
-  Users,
-  Target,
-  Calendar,
-  ArrowRight,
-  X,
-} from 'lucide-react';
+import { projectsApi, ApiError, type Project, type AuditType, type ProjectStatus } from '@/lib/api';
+import { Plus, X, Loader2 } from 'lucide-react';
 
 const AUDIT_TYPES: { value: AuditType; label: string }[] = [
   { value: 'WEB', label: 'Web' },
@@ -43,22 +16,35 @@ const AUDIT_TYPES: { value: AuditType; label: string }[] = [
   { value: 'OTHER', label: 'Autre' },
 ];
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: 'Brouillon', color: 'bg-muted text-muted-foreground' },
-  IN_PROGRESS: { label: 'En cours', color: 'bg-blue-500/10 text-blue-600' },
-  IN_REVIEW: { label: 'En revue', color: 'bg-yellow-500/10 text-yellow-600' },
-  DELIVERED: { label: 'Livré', color: 'bg-green-500/10 text-green-600' },
-  ARCHIVED: { label: 'Archivé', color: 'bg-muted text-muted-foreground' },
+const STATUS_LABEL: Record<ProjectStatus, string> = {
+  DRAFT: 'cadrage',
+  IN_PROGRESS: 'exécution',
+  IN_REVIEW: 'revue',
+  DELIVERED: 'livré',
+  ARCHIVED: 'archivé',
 };
+
+function relativeDate(dateStr?: string): { label: string; overdue: boolean } {
+  if (!dateStr) return { label: '—', overdue: false };
+  const target = new Date(dateStr).getTime();
+  const now = Date.now();
+  const days = Math.round((target - now) / (1000 * 60 * 60 * 24));
+  if (days === 0) return { label: "aujourd'hui", overdue: false };
+  if (days > 0) return { label: `dans ${days}j`, overdue: false };
+  return { label: `il y a ${-days}j`, overdue: true };
+}
 
 export default function ProjectsPage() {
   const { token } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [filter, setFilter] = useState<'all' | ProjectStatus>('all');
+  const [search, setSearch] = useState('');
   const [form, setForm] = useState({
     name: '',
     clientCompany: '',
@@ -68,6 +54,11 @@ export default function ProjectsPage() {
     endDate: '',
     auditType: 'WEB' as AuditType,
   });
+
+  // Auto-open create dialog if query param ?new=1
+  useEffect(() => {
+    if (searchParams?.get('new') === '1') setShowCreate(true);
+  }, [searchParams]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -91,7 +82,10 @@ export default function ProjectsPage() {
     try {
       const project = await projectsApi.create(form, token);
       setShowCreate(false);
-      setForm({ name: '', clientCompany: '', clientNeed: '', context: '', startDate: '', endDate: '', auditType: 'WEB' });
+      setForm({
+        name: '', clientCompany: '', clientNeed: '', context: '',
+        startDate: '', endDate: '', auditType: 'WEB',
+      });
       router.push(`/dashboard/projects/${project.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur lors de la création');
@@ -100,193 +94,386 @@ export default function ProjectsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const filtered = projects.filter((p) => {
+    if (filter !== 'all' && p.status !== filter) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) &&
+        !p.clientCompany.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const counts: Record<'all' | ProjectStatus, number> = {
+    all: projects.length,
+    DRAFT: projects.filter((p) => p.status === 'DRAFT').length,
+    IN_PROGRESS: projects.filter((p) => p.status === 'IN_PROGRESS').length,
+    IN_REVIEW: projects.filter((p) => p.status === 'IN_REVIEW').length,
+    DELIVERED: projects.filter((p) => p.status === 'DELIVERED').length,
+    ARCHIVED: projects.filter((p) => p.status === 'ARCHIVED').length,
+  };
 
   return (
-    <div className="p-4 sm:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">Projets</h1>
-          <p className="text-muted-foreground">Gérez vos audits de sécurité</p>
-        </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nouveau projet
-        </Button>
-      </div>
+    <>
+      <Topbar
+        crumbs={[{ label: 'Projets' }]}
+        actions={
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <Plus size={12} /> Nouveau projet
+          </button>
+        }
+      />
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Create dialog */}
-      {showCreate && (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Nouveau projet</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowCreate(false)}>
-                <X className="h-4 w-4" />
-              </Button>
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+        <div style={{ padding: '20px 24px 0' }}>
+          {/* Filters + search */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {(['all', 'IN_PROGRESS', 'IN_REVIEW', 'DRAFT', 'DELIVERED', 'ARCHIVED'] as const).map((k) => {
+                const active = filter === k;
+                const label = k === 'all' ? 'Tous' : STATUS_LABEL[k];
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setFilter(k)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 10px',
+                      background: active ? 'var(--bg-subtle)' : 'transparent',
+                      border: '1px solid',
+                      borderColor: active ? 'var(--border)' : 'transparent',
+                      borderRadius: 'var(--r-sm)',
+                      color: active ? 'var(--fg)' : 'var(--fg-muted)',
+                      fontSize: 12.5,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {label}
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>
+                      {counts[k]}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nom du projet</Label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Audit Web Corp"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Client</Label>
-                  <Input
-                    value={form.clientCompany}
-                    onChange={(e) => setForm({ ...form, clientCompany: e.target.value })}
-                    placeholder="Nom de l'entreprise cliente"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Besoin du client</Label>
-                <Input
-                  value={form.clientNeed}
-                  onChange={(e) => setForm({ ...form, clientNeed: e.target.value })}
-                  placeholder="Test d'intrusion de l'application web..."
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Contexte</Label>
-                <Input
-                  value={form.context}
-                  onChange={(e) => setForm({ ...form, context: e.target.value })}
-                  placeholder="Application e-commerce en production..."
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Date de début</Label>
-                  <Input
-                    type="date"
-                    value={form.startDate}
-                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Date de fin</Label>
-                  <Input
-                    type="date"
-                    value={form.endDate}
-                    onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Type d&apos;audit</Label>
-                  <Select value={form.auditType} onValueChange={(val) => setForm({ ...form, auditType: val as AuditType })}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {AUDIT_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-                <Button type="submit" disabled={creating}>
-                  {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Créer le projet
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Project list */}
-      {projects.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FolderOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <p className="text-lg font-medium">Aucun projet</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              Créez votre premier projet pour commencer un audit
-            </p>
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouveau projet
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => {
-            const status = STATUS_LABELS[project.status] || STATUS_LABELS.DRAFT;
-            const auditLabel = AUDIT_TYPES.find((t) => t.value === project.auditType)?.label || project.auditType;
-            return (
-              <Card
-                key={project.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => router.push(`/dashboard/projects/${project.id}`)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-base">{project.name}</CardTitle>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.color}`}>
-                      {status.label}
-                    </span>
-                  </div>
-                  <CardDescription>{project.clientCompany}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Target className="h-3.5 w-3.5" />
-                      {auditLabel}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3.5 w-3.5" />
-                      {project.members.length}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <FolderOpen className="h-3.5 w-3.5" />
-                      {project._count?.scopes || 0} scopes
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {new Date(project.startDate).toLocaleDateString('fr-FR')} — {new Date(project.endDate).toLocaleDateString('fr-FR')}
-                  </div>
-                  <div className="flex justify-end pt-1">
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+            <input
+              className="input"
+              placeholder="Rechercher…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ maxWidth: 260, marginLeft: 'auto' }}
+            />
+          </div>
         </div>
-      )}
+
+        {error && (
+          <div
+            style={{
+              margin: '0 24px 12px',
+              padding: '10px 12px',
+              fontSize: 13,
+              color: 'var(--sev-critical-fg)',
+              background: 'var(--sev-critical-bg)',
+              border: '1px solid var(--sev-critical-br)',
+              borderRadius: 'var(--r-md)',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {showCreate && (
+          <CreateDialog
+            form={form}
+            setForm={setForm}
+            onCancel={() => { setShowCreate(false); setError(''); }}
+            onSubmit={handleCreate}
+            creating={creating}
+          />
+        )}
+
+        {loading ? (
+          <div style={{ padding: 40, color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Chargement…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div
+            style={{
+              margin: '24px',
+              padding: 40,
+              textAlign: 'center',
+              border: '1px dashed var(--border)',
+              borderRadius: 'var(--r-lg)',
+              color: 'var(--fg-muted)',
+            }}
+          >
+            {projects.length === 0
+              ? 'Aucun projet pour l\'instant. Créez-en un pour démarrer.'
+              : 'Aucun projet ne correspond à ce filtre.'}
+          </div>
+        ) : (
+          <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+            {/* Header */}
+            <div
+              className="cap"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 220px 90px 100px 120px 100px',
+                gap: 12,
+                padding: '8px 24px',
+                borderBottom: '1px solid var(--border-subtle)',
+                background: 'var(--bg)',
+                position: 'sticky',
+                top: 0,
+                fontSize: 10.5,
+              }}
+            >
+              <div>Projet</div>
+              <div>Client</div>
+              <div>Type</div>
+              <div>Phase</div>
+              <div>Équipe</div>
+              <div style={{ textAlign: 'right' }}>Échéance</div>
+            </div>
+
+            {filtered.map((p) => {
+              const auditLabel = AUDIT_TYPES.find((t) => t.value === p.auditType)?.label || p.auditType;
+              const due = relativeDate(p.endDate);
+              const team = (p.members || []).map((m) => ({
+                id: m.user.id,
+                name: `${m.user.firstName} ${m.user.lastName}`,
+              }));
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => router.push(`/dashboard/projects/${p.id}`)}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 220px 90px 100px 120px 100px',
+                    gap: 12,
+                    padding: '12px 24px',
+                    alignItems: 'center',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    position: 'relative',
+                  }}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLDivElement).style.background = 'var(--bg-subtle)')
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLDivElement).style.background = 'transparent')
+                  }
+                >
+                  {due.overdue && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 2,
+                        background: 'var(--sev-critical-fg)',
+                      }}
+                    />
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <div className="mono" style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
+                    <div
+                      style={{
+                        fontSize: 11.5,
+                        color: 'var(--fg-subtle)',
+                        marginTop: 2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {p.clientNeed}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: 'var(--fg-muted)',
+                    }}
+                  >
+                    {p.clientCompany}
+                  </div>
+                  <div className="mono" style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{auditLabel}</div>
+                  <div style={{ fontSize: 12, color: 'var(--fg-muted)', textTransform: 'capitalize' }}>
+                    {STATUS_LABEL[p.status]}
+                  </div>
+                  <div>
+                    <AvatarStack users={team} max={3} />
+                  </div>
+                  <div
+                    className="mono"
+                    style={{
+                      fontSize: 12,
+                      color: due.overdue ? 'var(--sev-critical-fg)' : 'var(--fg-muted)',
+                      textAlign: 'right',
+                    }}
+                  >
+                    {due.label}
+                  </div>
+                </div>
+              );
+            })}
+
+            <div
+              style={{
+                padding: '12px 24px',
+                fontSize: 11.5,
+                color: 'var(--fg-subtle)',
+              }}
+              className="mono"
+            >
+              {projects.length} projet{projects.length > 1 ? 's' : ''} ·{' '}
+              {counts.IN_PROGRESS} actif{counts.IN_PROGRESS > 1 ? 's' : ''} ·{' '}
+              {counts.DELIVERED} livré{counts.DELIVERED > 1 ? 's' : ''}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+interface CreateDialogProps {
+  form: {
+    name: string;
+    clientCompany: string;
+    clientNeed: string;
+    context: string;
+    startDate: string;
+    endDate: string;
+    auditType: AuditType;
+  };
+  setForm: (f: CreateDialogProps['form']) => void;
+  onCancel: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+  creating: boolean;
+}
+
+function CreateDialog({ form, setForm, onCancel, onSubmit, creating }: CreateDialogProps) {
+  return (
+    <div style={{ margin: '0 24px 16px' }}>
+      <div className="card-htg sig-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div
+          style={{
+            padding: '12px 16px',
+            borderBottom: '1px solid var(--border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Nouveau projet</span>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn btn-ghost btn-sm"
+            style={{ marginLeft: 'auto' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <form onSubmit={onSubmit} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Nom du projet">
+              <input
+                className="input"
+                placeholder="acme-prod-2026"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </Field>
+            <Field label="Client">
+              <input
+                className="input"
+                placeholder="ACME Corp"
+                value={form.clientCompany}
+                onChange={(e) => setForm({ ...form, clientCompany: e.target.value })}
+                required
+              />
+            </Field>
+          </div>
+          <Field label="Besoin client">
+            <input
+              className="input"
+              placeholder="Test d'intrusion de l'application web…"
+              value={form.clientNeed}
+              onChange={(e) => setForm({ ...form, clientNeed: e.target.value })}
+              required
+            />
+          </Field>
+          <Field label="Contexte">
+            <input
+              className="input"
+              placeholder="Application e-commerce en production…"
+              value={form.context}
+              onChange={(e) => setForm({ ...form, context: e.target.value })}
+              required
+            />
+          </Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <Field label="Début">
+              <input
+                className="input"
+                type="date"
+                value={form.startDate}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                required
+              />
+            </Field>
+            <Field label="Fin">
+              <input
+                className="input"
+                type="date"
+                value={form.endDate}
+                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                required
+              />
+            </Field>
+            <Field label="Type d'audit">
+              <select
+                className="input"
+                value={form.auditType}
+                onChange={(e) => setForm({ ...form, auditType: e.target.value as AuditType })}
+              >
+                {AUDIT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+            <button type="button" className="btn" onClick={onCancel}>
+              Annuler
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={creating}>
+              {creating && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
+              Créer le projet
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span className="cap" style={{ fontSize: 10.5 }}>{label}</span>
+      {children}
+    </label>
   );
 }

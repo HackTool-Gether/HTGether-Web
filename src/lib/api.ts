@@ -249,6 +249,96 @@ export const scopesApi = {
     }),
 };
 
+// Findings API
+export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+export type FindingStatus = 'DRAFT' | 'CONFIRMED' | 'FALSE_POSITIVE' | 'FIXED';
+
+export interface Finding {
+  id: string;
+  slug?: string;
+  title: string;
+  severity: Severity;
+  cvssScore?: number;
+  cvssVector?: string;
+  description: string;
+  proof?: string;
+  impact?: string;
+  remediation?: string;
+  references?: string;
+  tags?: string;
+  status: FindingStatus;
+  projectId: string;
+  componentId?: string;
+  noteId?: string;
+  authorId: string;
+  author?: { id: string; firstName: string; lastName: string; email: string };
+  component?: { id: string; name: string; status: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateFindingData {
+  title: string;
+  severity: Severity;
+  cvssScore?: number;
+  cvssVector?: string;
+  description?: string;
+  proof?: string;
+  impact?: string;
+  remediation?: string;
+  references?: string;
+  tags?: string;
+  status?: FindingStatus;
+  componentId?: string;
+  noteId?: string;
+}
+
+export const findingsApi = {
+  getAllByProject: (projectId: string, token: string) =>
+    apiRequest<Finding[]>(`/projects/${projectId}/findings`, { token }),
+
+  create: (projectId: string, data: CreateFindingData, token: string) =>
+    apiRequest<Finding>(`/projects/${projectId}/findings`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getOne: (id: string, token: string) =>
+    apiRequest<Finding>(`/findings/${id}`, { token }),
+
+  update: (id: string, data: Partial<CreateFindingData>, token: string) =>
+    apiRequest<Finding>(`/findings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (id: string, token: string) =>
+    apiRequest<void>(`/findings/${id}`, { method: 'DELETE', token }),
+};
+
+// Reports API
+export interface Report {
+  id: string;
+  projectId: string;
+  content: any; // ProseMirror JSON document
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const reportsApi = {
+  get: (projectId: string, token: string) =>
+    apiRequest<Report>(`/projects/${projectId}/report`, { token }),
+
+  update: (projectId: string, content: any, token: string) =>
+    apiRequest<Report>(`/projects/${projectId}/report`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+      token,
+    }),
+};
+
 // Notes API
 export const notesApi = {
   getByScope: (projectId: string, scopeId: string, token: string) =>
