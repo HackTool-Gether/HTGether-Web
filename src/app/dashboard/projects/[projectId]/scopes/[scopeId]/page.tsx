@@ -7,10 +7,6 @@ import { scopesApi, notesApi, ApiError } from '@/lib/api';
 import type { ScopeDetail, Note } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Card,
-  CardContent,
-} from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   ArrowLeft,
@@ -84,7 +80,7 @@ export default function ScopeDetailPage() {
 
   if (!scope) {
     return (
-      <div className="p-8">
+      <div className="px-4 sm:px-8 pt-4 sm:pt-6">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>Scope introuvable</AlertDescription>
@@ -94,39 +90,39 @@ export default function ScopeDetailPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl">
-      {/* Breadcrumb */}
-      <div className="mb-6">
-        <Button variant="ghost" size="sm" className="mb-4" onClick={() => router.push(`/dashboard/projects/${projectId}`)}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          {scope.project.name}
-        </Button>
-        <h1 className="text-2xl font-bold">{scope.name}</h1>
-        {scope.description && (
-          <p className="text-sm text-muted-foreground mt-1">{scope.description}</p>
+    <div className="flex-1 overflow-auto">
+      <div className="px-4 sm:px-8 pt-4 sm:pt-6 max-w-4xl">
+        {/* Breadcrumb */}
+        <div className="mb-6">
+          <Button variant="ghost" size="sm" className="mb-4" onClick={() => router.push(`/dashboard/projects/${projectId}`)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {scope.project.name}
+          </Button>
+          <h1 className="text-2xl font-bold">{scope.name}</h1>
+          {scope.description && (
+            <p className="text-sm text-muted-foreground mt-1">{scope.description}</p>
+          )}
+        </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
-      </div>
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+        {/* Notes header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold">Notes</h2>
+          <Button size="sm" onClick={() => setShowNew(true)}>
+            <Plus className="mr-2 h-3.5 w-3.5" />
+            Nouvelle note
+          </Button>
+        </div>
 
-      {/* Notes header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">Notes</h2>
-        <Button size="sm" onClick={() => setShowNew(true)}>
-          <Plus className="mr-2 h-3.5 w-3.5" />
-          Nouvelle note
-        </Button>
-      </div>
-
-      {/* Create note form */}
-      {showNew && (
-        <Card className="mb-4">
-          <CardContent className="pt-4">
+        {/* Create note form */}
+        {showNew && (
+          <div className="rounded-xl bg-card p-4 mb-4">
             <form onSubmit={handleCreateNote} className="flex items-center gap-3">
               <Input
                 value={newTitle}
@@ -144,14 +140,12 @@ export default function ScopeDetailPage() {
                 Annuler
               </Button>
             </form>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* Notes list */}
-      {scope.notes.length === 0 && !showNew ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
+        {/* Notes list */}
+        {scope.notes.length === 0 && !showNew ? (
+          <div className="rounded-xl bg-card flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <p className="text-lg font-medium">Aucune note</p>
             <p className="text-sm text-muted-foreground mb-4">
@@ -161,45 +155,45 @@ export default function ScopeDetailPage() {
               <Plus className="mr-2 h-4 w-4" />
               Nouvelle note
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {scope.notes.map((note: Note) => (
-            <Card
-              key={note.id}
-              className="cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => router.push(`/dashboard/projects/${projectId}/scopes/${scopeId}/notes/${note.id}`)}
-            >
-              <CardContent className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-sm">{note.title}</p>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    <span className="text-xs text-muted-foreground">
-                      {note.author.firstName} {note.author.lastName}
-                    </span>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {new Date(note.updatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {scope.notes.map((note: Note) => (
+              <div
+                key={note.id}
+                className="rounded-xl bg-card cursor-pointer hover:bg-muted/30 transition-colors"
+                onClick={() => router.push(`/dashboard/projects/${projectId}/scopes/${scopeId}/notes/${note.id}`)}
+              >
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="font-medium text-sm">{note.title}</p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="text-xs text-muted-foreground">
+                        {note.author.firstName} {note.author.lastName}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {new Date(note.updatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteNote(note.id);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteNote(note.id);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

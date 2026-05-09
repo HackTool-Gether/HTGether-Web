@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { useEffect, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutGrid,
@@ -8,13 +8,14 @@ import {
   Users,
   Settings,
   Search,
-  ShieldAlert,
-  MoreHorizontal,
-  FileText,
+  LogOut,
+  ChevronRight,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { projectsApi, type Project } from '@/lib/api';
 import { Avatar } from './avatar';
+import { HtgLogo } from '@/components/ui/htg-logo';
 
 interface SidebarItemProps {
   icon?: LucideIcon;
@@ -22,11 +23,10 @@ interface SidebarItemProps {
   href?: string;
   active?: boolean;
   badge?: string | number;
-  indent?: number;
   onClick?: () => void;
 }
 
-function SidebarItem({ icon: Icon, label, href, active, badge, indent = 0, onClick }: SidebarItemProps) {
+function SidebarItem({ icon: Icon, label, href, active, badge, onClick }: SidebarItemProps) {
   const router = useRouter();
   const handleClick = () => {
     if (onClick) onClick();
@@ -41,7 +41,7 @@ function SidebarItem({ icon: Icon, label, href, active, badge, indent = 0, onCli
         alignItems: 'center',
         gap: 10,
         width: '100%',
-        padding: `7px 10px 7px ${10 + indent * 12}px`,
+        padding: '7px 10px',
         background: active ? 'var(--bg-subtle)' : 'transparent',
         border: '1px solid',
         borderColor: active ? 'var(--border-subtle)' : 'transparent',
@@ -72,19 +72,231 @@ function SidebarItem({ icon: Icon, label, href, active, badge, indent = 0, onCli
   );
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Brouillon',
+  IN_PROGRESS: 'En cours',
+  IN_REVIEW: 'Revue',
+};
+
+interface ProjectNavItemProps {
+  label: string;
+  href: string;
+  active: boolean;
+}
+
+function ProjectNavItem({ label, href, active }: ProjectNavItemProps) {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      onClick={() => router.push(href)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        width: '100%',
+        padding: '6px 10px 6px 38px',
+        background: active ? 'var(--bg-subtle)' : 'transparent',
+        border: '1px solid',
+        borderColor: active ? 'var(--border-subtle)' : 'transparent',
+        borderRadius: 'var(--r-md)',
+        color: active ? 'var(--fg)' : 'var(--fg-muted)',
+        fontSize: 12.5,
+        fontWeight: active ? 500 : 400,
+        textAlign: 'left',
+        cursor: 'pointer',
+        transition: 'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
+        fontFamily: 'inherit',
+      }}
+      onMouseEnter={(e) => {
+        if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-subtle)';
+      }}
+      onMouseLeave={(e) => {
+        if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+interface ProjectTreeItemProps {
+  project: Project;
+  expanded: boolean;
+  onToggle: () => void;
+  pathname: string;
+}
+
+function ProjectTreeItem({ project, expanded, onToggle, pathname }: ProjectTreeItemProps) {
+  const router = useRouter();
+  const base = `/dashboard/projects/${project.id}`;
+  const isInThisProject = pathname.startsWith(base);
+
+  return (
+    <div style={{ marginBottom: 2 }}>
+      {/* Project row */}
+      <button
+        type="button"
+        onClick={() => {
+          onToggle();
+          router.push(base);
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          width: '100%',
+          padding: '7px 10px',
+          background: isInThisProject ? 'var(--bg-subtle)' : 'transparent',
+          border: '1px solid',
+          borderColor: isInThisProject ? 'var(--border-subtle)' : 'transparent',
+          borderRadius: 'var(--r-md)',
+          textAlign: 'left',
+          cursor: 'pointer',
+          transition: 'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
+          fontFamily: 'inherit',
+        }}
+        onMouseEnter={(e) => {
+          if (!isInThisProject) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-subtle)';
+        }}
+        onMouseLeave={(e) => {
+          if (!isInThisProject) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 'var(--r-sm)',
+            background: isInThisProject
+              ? 'linear-gradient(135deg, var(--accent), oklch(from var(--accent) calc(l - 0.1) c h))'
+              : 'var(--bg-input)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            color: isInThisProject ? 'white' : 'var(--fg-muted)',
+            fontSize: 11,
+            fontWeight: 600,
+          }}
+        >
+          {project.name.charAt(0).toUpperCase()}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: 'var(--fg)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {project.name}
+          </div>
+          <div
+            className="mono"
+            style={{
+              fontSize: 10.5,
+              color: 'var(--fg-subtle)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {project.clientCompany}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <span
+            className="mono"
+            style={{
+              fontSize: 10,
+              padding: '2px 5px',
+              borderRadius: 'var(--r-sm)',
+              background: 'var(--bg-input)',
+              color: 'var(--fg-subtle)',
+            }}
+          >
+            {STATUS_LABELS[project.status] || project.status}
+          </span>
+          <ChevronRight
+            size={12}
+            style={{
+              color: 'var(--fg-subtle)',
+              transition: 'transform var(--dur-fast) var(--ease-out)',
+              transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+            }}
+          />
+        </div>
+      </button>
+
+      {/* Sub-navigation */}
+      {expanded && (
+        <div style={{ padding: '4px 0 2px' }}>
+          <ProjectNavItem
+            label="Vue d'ensemble"
+            href={base}
+            active={pathname === base}
+          />
+          <ProjectNavItem
+            label="Findings"
+            href={`${base}/findings`}
+            active={pathname.startsWith(`${base}/findings`)}
+          />
+          <ProjectNavItem
+            label="Rapport"
+            href={`${base}/report`}
+            active={pathname.startsWith(`${base}/report`)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface SidebarProps {
   onOpenPalette: () => void;
-  /** Optional active project to expand sub-nav */
   activeProject?: { id: string; slug: string; findingsCount?: number; scopesCount?: number };
 }
 
-export function Sidebar({ onOpenPalette, activeProject }: SidebarProps) {
+export function Sidebar({ onOpenPalette }: SidebarProps) {
   const pathname = usePathname() || '';
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const inProject =
-    !!activeProject &&
-    pathname.startsWith(`/dashboard/projects/${activeProject.id}`);
+  const loadProjects = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await projectsApi.getAll(token);
+      setProjects(data);
+    } catch {
+      // silently fail
+    }
+  }, [token]);
+
+  useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  // Auto-expand the project whose page we're on
+  useEffect(() => {
+    const match = pathname.match(/\/dashboard\/projects\/([^/]+)/);
+    if (match) {
+      const id = match[1];
+      setExpanded((prev) => {
+        if (prev[id]) return prev;
+        return { ...prev, [id]: true };
+      });
+    }
+  }, [pathname]);
+
+  const toggleProject = (id: string) => {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const activeProjects = projects.filter(
+    (p) => p.status === 'IN_PROGRESS' || p.status === 'IN_REVIEW' || p.status === 'DRAFT'
+  );
 
   return (
     <aside
@@ -110,14 +322,9 @@ export function Sidebar({ onOpenPalette, activeProject }: SidebarProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'var(--accent-fg)',
-            fontWeight: 700,
-            fontSize: 12,
-            fontFamily: 'var(--font-mono)',
-            letterSpacing: '-0.03em',
           }}
         >
-          HT
+          <HtgLogo size={18} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>HTGether</span>
@@ -169,40 +376,23 @@ export function Sidebar({ onOpenPalette, activeProject }: SidebarProps) {
           icon={Folder}
           label="Projets"
           href="/dashboard/projects"
-          active={pathname.startsWith('/dashboard/projects')}
+          active={pathname === '/dashboard/projects'}
         />
 
-        {inProject && activeProject && (
+        {activeProjects.length > 0 && (
           <>
             <div className="cap" style={{ padding: '16px 10px 6px', fontSize: 10.5 }}>
-              Projet actif
+              Projets actifs
             </div>
-            <SidebarItem
-              icon={ShieldAlert}
-              label={activeProject.slug}
-              href={`/dashboard/projects/${activeProject.id}`}
-              active={pathname === `/dashboard/projects/${activeProject.id}`}
-            />
-            <SidebarItem
-              label="Overview"
-              indent={1}
-              href={`/dashboard/projects/${activeProject.id}`}
-              active={pathname === `/dashboard/projects/${activeProject.id}`}
-            />
-            <SidebarItem
-              label="Findings"
-              indent={1}
-              badge={activeProject.findingsCount}
-              href={`/dashboard/projects/${activeProject.id}/findings`}
-              active={pathname.startsWith(`/dashboard/projects/${activeProject.id}/findings`)}
-            />
-            <SidebarItem
-              icon={FileText}
-              label="Rapport"
-              indent={1}
-              href={`/dashboard/projects/${activeProject.id}/report`}
-              active={pathname.startsWith(`/dashboard/projects/${activeProject.id}/report`)}
-            />
+            {activeProjects.map((p) => (
+              <ProjectTreeItem
+                key={p.id}
+                project={p}
+                expanded={!!expanded[p.id]}
+                onToggle={() => toggleProject(p.id)}
+                pathname={pathname}
+              />
+            ))}
           </>
         )}
 
@@ -272,7 +462,7 @@ export function Sidebar({ onOpenPalette, activeProject }: SidebarProps) {
             padding: 4,
           }}
         >
-          <MoreHorizontal size={14} />
+          <LogOut size={14} />
         </button>
       </div>
     </aside>

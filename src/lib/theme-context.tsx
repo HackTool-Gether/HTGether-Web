@@ -16,7 +16,10 @@ const STORAGE_KEY = 'htg-theme';
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function applyThemeToDocument(theme: Theme) {
-  document.documentElement.classList.toggle('dark', theme === 'dark');
+  const root = document.documentElement;
+  root.classList.toggle('dark', theme === 'dark');
+  root.classList.toggle('light', theme === 'light');
+  root.setAttribute('data-theme', theme);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

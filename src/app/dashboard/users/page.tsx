@@ -110,7 +110,7 @@ export default function UsersPage() {
   if (currentUser?.role !== 'SUPER_ADMIN') return null;
 
   return (
-    <div className="p-4 sm:p-8 max-w-4xl">
+    <div className="p-4 sm:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold">Utilisateurs</h1>
@@ -194,7 +194,7 @@ export default function UsersPage() {
 
       {/* Created user - show password */}
       {createdUser && (
-        <Card className="mb-6 border-green-500/50">
+        <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -210,7 +210,7 @@ export default function UsersPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="rounded-lg bg-secondary p-4 space-y-3">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase">Utilisateur</p>
                 <p className="text-sm font-medium">{createdUser.firstName} {createdUser.lastName}</p>
@@ -222,7 +222,7 @@ export default function UsersPage() {
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Mot de passe temporaire</p>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-md border bg-background px-3 py-2 text-sm font-mono">
+                  <div className="flex-1 rounded-md bg-background px-3 py-2 text-sm font-mono">
                     {showPassword ? createdUser.generatedPassword : '••••••••••••'}
                   </div>
                   <Button

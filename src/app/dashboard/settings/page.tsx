@@ -375,7 +375,7 @@ export default function SettingsPage() {
   const availablePresets = SSO_PRESETS.filter((p) => !existingOidcNames.includes(p.name));
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Paramètres</h1>
         <p className="text-muted-foreground">
@@ -393,14 +393,14 @@ export default function SettingsPage() {
         </Alert>
       )}
       {success && (
-        <Alert className="mb-6 border-green-500/50 text-green-600">
+        <Alert className="mb-6 bg-green-500/10 text-green-500">
           <Check className="h-4 w-4" />
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg border p-1 mb-6">
+      <div className="flex gap-1 rounded-lg bg-secondary p-1 mb-6">
         {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -428,7 +428,7 @@ export default function SettingsPage() {
             <CardDescription>Personnalisez le mode visuel de la plateforme</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="flex items-center justify-between rounded-lg bg-secondary p-4">
               <div className="space-y-1">
                 <Label htmlFor="whiteMode" className="text-sm font-medium">White mode</Label>
                 <p className="text-sm text-muted-foreground">
@@ -580,7 +580,7 @@ export default function SettingsPage() {
             <CardDescription>Assistance à la rédaction, suggestions de remédiation, analyse</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="flex items-center justify-between rounded-lg bg-secondary p-4">
               <div>
                 <p className="font-medium">Activer le module IA</p>
                 <p className="text-sm text-muted-foreground">
@@ -600,10 +600,10 @@ export default function SettingsPage() {
                     <button
                       key={provider.id}
                       onClick={() => setAi({ ...ai, provider: provider.id, model: provider.models[0] })}
-                      className={`rounded-lg border p-4 text-left transition-colors ${
+                      className={`rounded-lg p-4 text-left transition-colors ${
                         ai.provider === provider.id
-                          ? 'border-primary bg-primary/5'
-                          : 'hover:border-muted-foreground/30'
+                          ? 'bg-primary/10'
+                          : 'bg-secondary hover:bg-secondary/70'
                       }`}
                     >
                       <p className="font-medium text-sm">{provider.name}</p>
@@ -664,10 +664,10 @@ export default function SettingsPage() {
             <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => setEmailProvider('none')}
-                className={`rounded-lg border p-4 text-center transition-colors ${
+                className={`rounded-lg p-4 text-center transition-colors ${
                   emailProvider === 'none'
-                    ? 'border-primary bg-primary/5'
-                    : 'hover:border-muted-foreground/30'
+                    ? 'bg-primary/10'
+                    : 'bg-secondary hover:bg-secondary/70'
                 }`}
               >
                 <p className="font-medium text-sm">Désactivé</p>
@@ -675,10 +675,10 @@ export default function SettingsPage() {
               </button>
               <button
                 onClick={() => setEmailProvider('smtp')}
-                className={`rounded-lg border p-4 text-center transition-colors ${
+                className={`rounded-lg p-4 text-center transition-colors ${
                   emailProvider === 'smtp'
-                    ? 'border-primary bg-primary/5'
-                    : 'hover:border-muted-foreground/30'
+                    ? 'bg-primary/10'
+                    : 'bg-secondary hover:bg-secondary/70'
                 }`}
               >
                 <p className="font-medium text-sm">SMTP</p>
@@ -686,10 +686,10 @@ export default function SettingsPage() {
               </button>
               <button
                 onClick={() => setEmailProvider('mailgun')}
-                className={`rounded-lg border p-4 text-center transition-colors ${
+                className={`rounded-lg p-4 text-center transition-colors ${
                   emailProvider === 'mailgun'
-                    ? 'border-primary bg-primary/5'
-                    : 'hover:border-muted-foreground/30'
+                    ? 'bg-primary/10'
+                    : 'bg-secondary hover:bg-secondary/70'
                 }`}
               >
                 <p className="font-medium text-sm">Mailgun</p>
@@ -699,7 +699,7 @@ export default function SettingsPage() {
 
             {/* SMTP config */}
             {emailProvider === 'smtp' && (
-              <div className="space-y-3 rounded-lg border p-4">
+              <div className="space-y-3 rounded-lg bg-secondary p-4">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-1">
                     <Label className="text-xs">Serveur SMTP</Label>
@@ -774,7 +774,7 @@ export default function SettingsPage() {
 
             {/* Mailgun config */}
             {emailProvider === 'mailgun' && (
-              <div className="space-y-3 rounded-lg border p-4">
+              <div className="space-y-3 rounded-lg bg-secondary p-4">
                 <div className="space-y-1">
                   <Label className="text-xs">API Key</Label>
                   <Input
@@ -880,7 +880,7 @@ function OidcProviderCard({
             Callback URL (à copier dans la console {provider.name})
           </Label>
           <div className="flex items-center gap-2">
-            <div className="flex-1 rounded-md border bg-muted/50 px-3 py-1.5 text-xs font-mono text-muted-foreground select-all truncate">
+            <div className="flex-1 rounded-md bg-secondary px-3 py-1.5 text-xs font-mono text-muted-foreground select-all truncate">
               {callbackUrl}
             </div>
             <Button type="button" variant="outline" size="sm" className="h-8 px-2 shrink-0" onClick={onCopy}>

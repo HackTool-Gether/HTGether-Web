@@ -8,15 +8,9 @@ import type { AuthProviderInfo } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Shield, Loader2, AlertCircle, KeyRound, Globe, Server } from 'lucide-react';
+import { Loader2, AlertCircle, Globe, Server, KeyRound, Shield } from 'lucide-react';
+import { HtgLogo } from '@/components/ui/htg-logo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -55,7 +49,6 @@ export default function LoginPage() {
         const enabledProviders = await authProvidersApi.getEnabled();
         setProviders(enabledProviders);
 
-        // Set default tab based on available providers
         if (enabledProviders.some((p) => p.type === 'LOCAL')) {
           setActiveTab('LOCAL');
         } else if (enabledProviders.some((p) => p.type === 'LDAP')) {
@@ -70,11 +63,9 @@ export default function LoginPage() {
     init();
   }, [user, router]);
 
-  // Handle OIDC callback if we're returning from SSO
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
-    // Retrieve providerId from sessionStorage (stored before redirect)
     const providerId = sessionStorage.getItem('htgether_oidc_provider');
 
     if (code && providerId) {
@@ -156,7 +147,6 @@ export default function LoginPage() {
     try {
       const callbackUrl = window.location.origin + '/login';
       const { authUrl } = await authApi.oidcAuthorize(provider.id, callbackUrl);
-      // Store providerId before redirecting — Google won't send it back
       sessionStorage.setItem('htgether_oidc_provider', provider.id);
       window.location.href = authUrl;
     } catch (err) {
@@ -167,191 +157,400 @@ export default function LoginPage() {
 
   if (checkingSetup) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
+      <div className="flex h-screen items-center justify-center" style={{ background: 'var(--bg)' }}>
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
 
-  const getProviderIcon = (type: string) => {
-    switch (type) {
-      case 'OIDC':
-        return <Globe className="mr-2 h-4 w-4" />;
-      case 'LDAP':
-        return <Server className="mr-2 h-4 w-4" />;
-      case 'SAML':
-        return <KeyRound className="mr-2 h-4 w-4" />;
-      default:
-        return null;
-    }
-  };
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md space-y-8">
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
-            <Shield className="h-7 w-7 text-primary-foreground" />
+    <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
+      {/* Left — Form */}
+      <div className="flex w-full flex-col justify-center px-8 py-12 lg:w-1/2 lg:px-20 xl:px-28">
+        <div className="mx-auto w-full max-w-[420px]">
+          {/* Title */}
+          <h1
+            style={{
+              fontSize: 32,
+              fontWeight: 600,
+              letterSpacing: '-0.03em',
+              lineHeight: 1.1,
+              color: 'var(--fg)',
+              marginBottom: 8,
+            }}
+          >
+            Content de vous revoir
+          </h1>
+          <p
+            style={{
+              fontSize: 15,
+              color: 'var(--fg-subtle)',
+              marginBottom: 36,
+              lineHeight: 1.5,
+            }}
+          >
+            Connectez-vous pour accéder à votre espace de travail.
+          </p>
+
+          {/* Error */}
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* SSO Buttons */}
+          {(oidcProviders.length > 0 || samlProviders.length > 0) && (
+            <div className="flex flex-col gap-2.5 mb-6">
+              {oidcProviders.map((provider) => (
+                <Button
+                  key={provider.id}
+                  variant="outline"
+                  onClick={() => handleOidcLogin(provider)}
+                  disabled={ssoLoading === provider.id}
+                  className="w-full h-11 text-sm font-medium gap-2.5"
+                >
+                  {ssoLoading === provider.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  Continuer avec {provider.name}
+                </Button>
+              ))}
+              {samlProviders.map((provider) => (
+                <Button
+                  key={provider.id}
+                  variant="outline"
+                  disabled
+                  className="w-full h-11 text-sm font-medium gap-2.5 opacity-50"
+                >
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  Continuer avec {provider.name}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {/* Separator */}
+          {(oidcProviders.length > 0 || samlProviders.length > 0) && hasCredentialForm && (
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground uppercase tracking-widest">ou</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+          )}
+
+          {/* Credential tabs */}
+          {hasMultipleCredentialMethods && (
+            <div className="flex rounded-lg bg-muted p-1 mb-5 border border-border">
+              {(['LOCAL', 'LDAP'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => { setActiveTab(tab); setError(''); }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-[13px] font-medium transition-all ${
+                    activeTab === tab
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {tab === 'LDAP' && <Server className="h-3.5 w-3.5" />}
+                  {tab === 'LOCAL' ? 'Email' : 'LDAP'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Credential form */}
+          {hasCredentialForm && (
+            <form
+              onSubmit={activeTab === 'LDAP' ? handleLdapSubmit : handleLocalSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Label htmlFor="email" style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder={activeTab === 'LDAP' ? 'user@domain.local' : 'admin@example.com'}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  autoFocus
+                  className="h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm"
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Label htmlFor="password" style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>
+                  Mot de passe
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  minLength={8}
+                  className="h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '11px 16px',
+                  background: 'var(--accent)',
+                  color: 'var(--accent-fg)',
+                  border: 'none',
+                  borderRadius: 'var(--r-lg)',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.7 : 1,
+                  transition: 'background 0.15s, opacity 0.15s',
+                  fontFamily: 'inherit',
+                  marginTop: 4,
+                }}
+                onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = 'var(--accent-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent)'; }}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Connexion...
+                  </>
+                ) : (
+                  'Se connecter'
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* Admin login fallback */}
+          {!hasLocal && !showAdminLogin && (
+            <div className="flex mt-6">
+              <Button
+                variant="ghost"
+                onClick={() => { setShowAdminLogin(true); setActiveTab('LOCAL'); }}
+                className="text-muted-foreground hover:text-foreground gap-1.5 border-black cursor-pointer"
+              >
+                <Shield className="h-3 w-3" />
+                Connexion administrateur
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right — Decorative panel */}
+      <div
+        className="hidden lg:flex"
+        style={{
+          width: '50%',
+          position: 'relative',
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #0c0d1a 0%, #141432 40%, #1a1a3e 100%)',
+        }}
+      >
+        {/* Grid overlay */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `
+              linear-gradient(rgba(94, 106, 210, 0.06) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(94, 106, 210, 0.06) 1px, transparent 1px)
+            `,
+            backgroundSize: '48px 48px',
+          }}
+        />
+
+        {/* Accent glow */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '20%',
+            right: '10%',
+            width: 320,
+            height: 320,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(94, 106, 210, 0.15) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '15%',
+            left: '5%',
+            width: 240,
+            height: 240,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(130, 143, 255, 0.10) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+          }}
+        />
+
+        {/* Geometric shapes */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '12%',
+            left: '15%',
+            width: 120,
+            height: 120,
+            borderRadius: 'var(--r-xl)',
+            border: '1px solid rgba(94, 106, 210, 0.20)',
+            background: 'rgba(94, 106, 210, 0.05)',
+            transform: 'rotate(15deg)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: '8%',
+            right: '20%',
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            border: '1px solid rgba(94, 106, 210, 0.15)',
+            background: 'rgba(94, 106, 210, 0.04)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '25%',
+            right: '15%',
+            width: 160,
+            height: 160,
+            borderRadius: 'var(--r-xxl)',
+            border: '1px solid rgba(130, 143, 255, 0.15)',
+            background: 'rgba(130, 143, 255, 0.04)',
+            transform: 'rotate(-10deg)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '10%',
+            left: '20%',
+            width: 100,
+            height: 100,
+            borderRadius: 'var(--r-lg)',
+            border: '1px solid rgba(94, 106, 210, 0.12)',
+            background: 'rgba(94, 106, 210, 0.03)',
+            transform: 'rotate(25deg)',
+          }}
+        />
+
+        {/* Center badge */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+          }}
+        >
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 'var(--r-xl)',
+              background: 'rgba(94, 106, 210, 0.10)',
+              border: '1px solid rgba(94, 106, 210, 0.20)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <HtgLogo size={32} style={{ opacity: 0.6 }} />
           </div>
-          <div className="text-center">
-            <h1 className="text-3xl font-bold tracking-tight">HTGether</h1>
-            <p className="text-sm text-muted-foreground">
-              Plateforme collaborative de pentest
-            </p>
+          <div style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: 20,
+                fontWeight: 600,
+                letterSpacing: '-0.02em',
+                color: 'rgba(247, 248, 248, 0.80)',
+                marginBottom: 4,
+              }}
+            >
+              HTGether
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: 'rgba(138, 143, 152, 0.70)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Pentest collaboratif
+            </div>
           </div>
         </div>
 
-        {/* Login Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Connexion</CardTitle>
-            <CardDescription>
-              Connectez-vous pour accéder à la plateforme
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+        {/* Decorative lines */}
+        <svg
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+          viewBox="0 0 600 900"
+          fill="none"
+          preserveAspectRatio="xMidYMid slice"
+        >
+          <line x1="80" y1="0" x2="80" y2="900" stroke="rgba(94,106,210,0.08)" strokeWidth="1" />
+          <line x1="200" y1="0" x2="200" y2="900" stroke="rgba(94,106,210,0.05)" strokeWidth="1" />
+          <line x1="400" y1="0" x2="400" y2="900" stroke="rgba(94,106,210,0.08)" strokeWidth="1" />
+          <line x1="520" y1="0" x2="520" y2="900" stroke="rgba(94,106,210,0.05)" strokeWidth="1" />
+          <line x1="0" y1="200" x2="600" y2="200" stroke="rgba(94,106,210,0.06)" strokeWidth="1" />
+          <line x1="0" y1="450" x2="600" y2="450" stroke="rgba(94,106,210,0.04)" strokeWidth="1" />
+          <line x1="0" y1="700" x2="600" y2="700" stroke="rgba(94,106,210,0.06)" strokeWidth="1" />
+          {/* Diagonal accents */}
+          <line x1="0" y1="300" x2="300" y2="0" stroke="rgba(130,143,255,0.06)" strokeWidth="1" />
+          <line x1="300" y1="900" x2="600" y2="600" stroke="rgba(130,143,255,0.06)" strokeWidth="1" />
+        </svg>
 
-            {/* SSO Buttons (OIDC / SAML) */}
-            {(oidcProviders.length > 0 || samlProviders.length > 0) && (
-              <div className="space-y-2">
-                {oidcProviders.map((provider) => (
-                  <Button
-                    key={provider.id}
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleOidcLogin(provider)}
-                    disabled={ssoLoading === provider.id}
-                  >
-                    {ssoLoading === provider.id ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      getProviderIcon('OIDC')
-                    )}
-                    Continuer avec {provider.name}
-                  </Button>
-                ))}
-                {samlProviders.map((provider) => (
-                  <Button
-                    key={provider.id}
-                    variant="outline"
-                    className="w-full"
-                    disabled
-                  >
-                    {getProviderIcon('SAML')}
-                    Continuer avec {provider.name}
-                  </Button>
-                ))}
-              </div>
-            )}
-
-            {/* Separator */}
-            {(oidcProviders.length > 0 || samlProviders.length > 0) &&
-              hasCredentialForm && (
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
-                      ou
-                    </span>
-                  </div>
-                </div>
-              )}
-
-            {/* Credential tabs (Local / LDAP) */}
-            {hasMultipleCredentialMethods && (
-              <div className="flex rounded-lg border p-1">
-                <button
-                  onClick={() => { setActiveTab('LOCAL'); setError(''); }}
-                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    activeTab === 'LOCAL'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Email
-                </button>
-                <button
-                  onClick={() => { setActiveTab('LDAP'); setError(''); }}
-                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    activeTab === 'LDAP'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  LDAP
-                </button>
-              </div>
-            )}
-
-            {/* Credential form */}
-            {hasCredentialForm && (
-              <form
-                onSubmit={activeTab === 'LDAP' ? handleLdapSubmit : handleLocalSubmit}
-                className="space-y-4"
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder={activeTab === 'LDAP' ? 'user@domain.local' : 'admin@example.com'}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                    autoFocus
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Mot de passe</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                    minLength={8}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Connexion...
-                    </>
-                  ) : (
-                    'Se connecter'
-                  )}
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Admin login fallback — always accessible */}
-        {!hasLocal && !showAdminLogin && (
-          <div className="text-center">
-            <button
-              onClick={() => { setShowAdminLogin(true); setActiveTab('LOCAL'); }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Connexion administrateur
-            </button>
-          </div>
-        )}
+        {/* Corner dots */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 32,
+            right: 32,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 6px)',
+            gap: 8,
+          }}
+        >
+          {Array.from({ length: 16 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                width: 3,
+                height: 3,
+                borderRadius: '50%',
+                background: `rgba(94, 106, 210, ${0.12 + (i % 4) * 0.04})`,
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -18,30 +18,10 @@ export default function RootLayout({
     <html
       lang="fr"
       data-theme="dark"
-      data-accent="amber"
-      data-signature="rulers"
       className="dark"
       suppressHydrationWarning
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var el = document.documentElement;
-                  var accent = localStorage.getItem('htg-accent') || 'amber';
-                  var sig = localStorage.getItem('htg-signature') || 'rulers';
-                  if (['amber','cyan','indigo'].indexOf(accent) >= 0) el.setAttribute('data-accent', accent);
-                  if (['rulers','ticks','mono','rails','none'].indexOf(sig) >= 0) el.setAttribute('data-signature', sig);
-                  el.classList.add('dark');
-                  el.setAttribute('data-theme', 'dark');
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
+      <head />
       <body
         className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}
       >

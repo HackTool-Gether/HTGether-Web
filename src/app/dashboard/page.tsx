@@ -2,58 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Topbar } from '@/components/shell/topbar';
 import { AvatarStack } from '@/components/shell/avatar';
 import { useAuth } from '@/lib/auth-context';
 import { projectsApi, type Project } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 import {
   Folder,
   Bug,
   Clock,
   FileText,
   Plus,
-  Filter,
   ArrowRight,
   Activity,
-  Command,
   Network,
+  Command,
+  Loader2,
 } from 'lucide-react';
-
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  hint?: string;
-  icon: typeof Folder;
-}
-
-function StatCard({ label, value, hint, icon: Icon }: StatCardProps) {
-  return (
-    <div
-      className="card-htg sig-card"
-      style={{ padding: 16, flex: 1, minWidth: 0, position: 'relative' }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Icon size={14} strokeWidth={1.75} style={{ color: 'var(--fg-subtle)' }} />
-        <span className="cap" style={{ fontSize: 10.5 }}>{label}</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span
-          style={{
-            fontSize: 26,
-            fontWeight: 600,
-            letterSpacing: '-0.02em',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          {value}
-        </span>
-      </div>
-      {hint && (
-        <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 6 }}>{hint}</div>
-      )}
-    </div>
-  );
-}
 
 function StatusPhase(status: Project['status']): string {
   const map: Record<Project['status'], string> = {
@@ -67,7 +31,6 @@ function StatusPhase(status: Project['status']): string {
 }
 
 function progressFor(p: Project): number {
-  // Placeholder: derive a rough progress % from status
   const map: Record<Project['status'], number> = {
     DRAFT: 8,
     IN_PROGRESS: 50,
@@ -102,8 +65,7 @@ export default function DashboardPage() {
   const isEmpty = !loading && projects && projects.length === 0;
 
   return (
-    <>
-      <Topbar crumbs={[{ label: 'Tableau de bord' }]} />
+    <div className="flex-1 overflow-auto">
       {isEmpty ? (
         <DashboardEmpty firstName={user?.firstName} />
       ) : (
@@ -117,152 +79,101 @@ export default function DashboardPage() {
           onAllProjects={() => router.push('/dashboard/projects')}
         />
       )}
-    </>
+    </div>
   );
 }
 
 function DashboardEmpty({ firstName }: { firstName?: string }) {
   const router = useRouter();
   return (
-    <div
-      className="sig-surface"
-      style={{ padding: '40px 32px', minHeight: '100%', overflow: 'auto' }}
-    >
-      <div style={{ maxWidth: 820, margin: '0 auto' }}>
-        <div style={{ marginBottom: 28 }}>
+    <div className="px-4 sm:px-8 pt-4 sm:pt-6 ">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold">
+          Bonjour {firstName || ''}.
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2 max-w-lg leading-relaxed">
+          Votre espace de travail est prêt. Commencez par créer votre premier projet de
+          pentest — tout le reste (findings, rapport, chaînes d&apos;attaque) en découlera.
+        </p>
+      </div>
+
+      <div className="rounded-xl bg-card mb-6">
+        {[
+          {
+            n: '01',
+            title: 'Créez un projet',
+            desc: 'Définissez le client, les dates et la nature de l\'audit.',
+            cta: 'Créer un projet',
+            primary: true,
+            action: () => router.push('/dashboard/projects?new=1'),
+          },
+          {
+            n: '02',
+            title: 'Déclarez un périmètre',
+            desc: 'IPs, domaines, applications. Vous pourrez en ajouter plus tard.',
+            cta: 'En savoir plus',
+            primary: false,
+            action: () => router.push('/dashboard/projects'),
+          },
+          {
+            n: '03',
+            title: 'Prenez vos premières notes',
+            desc: 'Tapez « / » pour insérer des blocs : finding, composant, variable…',
+            cta: 'Voir l\'éditeur',
+            primary: false,
+            action: () => router.push('/dashboard/projects'),
+          },
+        ].map((s, i) => (
           <div
-            className="mono"
-            style={{
-              fontSize: 11,
-              color: 'var(--fg-subtle)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              marginBottom: 8,
-            }}
+            key={s.n}
+            className={`flex items-center gap-4 px-4 py-4 ${
+              i > 0 ? 'border-t border-transparent' : ''
+            }`}
+            style={i > 0 ? { borderColor: 'var(--bg)' } : undefined}
           >
-            ~/ Bienvenue
-          </div>
-          <h1
-            style={{
-              fontSize: 'var(--text-display-size)',
-              lineHeight: 'var(--text-display-lh)',
-              fontWeight: 600,
-              letterSpacing: 'var(--text-display-track)',
-              margin: 0,
-            }}
-          >
-            Bonjour {firstName || ''}.
-          </h1>
-          <p
-            style={{
-              fontSize: 15,
-              color: 'var(--fg-muted)',
-              marginTop: 8,
-              maxWidth: 520,
-              lineHeight: 1.55,
-            }}
-          >
-            Votre espace de travail est prêt. Commencez par créer votre premier projet de
-            pentest — tout le reste (findings, rapport, chaînes d&apos;attaque) en découlera.
-          </p>
-        </div>
-
-        <div className="card-htg sig-card" style={{ padding: 4, marginBottom: 24 }}>
-          {[
-            {
-              n: '01',
-              title: 'Créez un projet',
-              desc: 'Définissez le client, les dates et la nature de l\'audit.',
-              cta: 'Créer un projet',
-              primary: true,
-              action: () => router.push('/dashboard/projects?new=1'),
-            },
-            {
-              n: '02',
-              title: 'Déclarez un périmètre',
-              desc: 'IPs, domaines, applications. Vous pourrez en ajouter plus tard.',
-              cta: 'En savoir plus',
-              primary: false,
-              action: () => router.push('/dashboard/projects'),
-            },
-            {
-              n: '03',
-              title: 'Prenez vos premières notes',
-              desc: 'Tapez « / » pour insérer des blocs : finding, composant, variable…',
-              cta: 'Voir l\'éditeur',
-              primary: false,
-              action: () => router.push('/dashboard/projects'),
-            },
-          ].map((s, i, arr) => (
-            <div
-              key={s.n}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 16,
-                padding: '16px 18px',
-                borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-              }}
-            >
-              <div
-                className="mono"
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 'var(--r-md)',
-                  background: 'var(--bg-input)',
-                  border: '1px solid var(--border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: 'var(--fg-muted)',
-                }}
-              >
-                {s.n}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>{s.title}</div>
-                <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>{s.desc}</div>
-              </div>
-              <button
-                type="button"
-                onClick={s.action}
-                className={`btn ${s.primary ? 'btn-primary' : ''}`}
-              >
-                {s.cta}
-                <ArrowRight size={13} />
-              </button>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary font-mono">
+              {s.n}
             </div>
-          ))}
-        </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">{s.title}</p>
+              <p className="text-sm text-muted-foreground">{s.desc}</p>
+            </div>
+            <Button
+              variant={s.primary ? 'default' : 'ghost'}
+              size="sm"
+              onClick={s.action}
+            >
+              {s.cta}
+              <ArrowRight className="ml-1 h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+      </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {[
-            {
-              t: 'Raccourcis essentiels',
-              d: '⌘K palette · / blocs · ⌘⏎ promouvoir en finding',
-              i: Command,
-            },
-            {
-              t: 'Modèles de rapport',
-              d: 'Partez d\'un template OWASP, EBIOS-RM ou vide.',
-              i: FileText,
-            },
-          ].map((c) => {
-            const I = c.i;
-            return (
-              <div key={c.t} className="card-htg" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <I size={15} strokeWidth={1.75} style={{ color: 'var(--accent)' }} />
-                  <span style={{ fontSize: 13.5, fontWeight: 500 }}>{c.t}</span>
-                </div>
-                <div style={{ fontSize: 12.5, color: 'var(--fg-muted)' }}>{c.d}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {[
+          {
+            t: 'Raccourcis essentiels',
+            d: '⌘K palette · / blocs · ⌘⏎ promouvoir en finding',
+            i: Command,
+          },
+          {
+            t: 'Modèles de rapport',
+            d: 'Partez d\'un template OWASP, EBIOS-RM ou vide.',
+            i: FileText,
+          },
+        ].map((c) => {
+          const Icon = c.i;
+          return (
+            <div key={c.t} className="rounded-xl bg-card p-4">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <Icon className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">{c.t}</span>
               </div>
-            );
-          })}
-        </div>
+              <p className="text-xs text-muted-foreground">{c.d}</p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -292,96 +203,72 @@ function DashboardActive({
   const recent = projects.slice(0, 3);
 
   return (
-    <div
-      className="sig-surface"
-      style={{ padding: '28px 32px', minHeight: '100%', overflow: 'auto' }}
-    >
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <div
-          style={{
-            marginBottom: 20,
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            gap: 16,
-          }}
-        >
+    <div className="px-4 sm:px-8 pt-4 sm:pt-6">
+      {/* Header */}
+      <div className="flex items-end justify-between gap-4 mb-6">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
+            {today}
+          </p>
+          <h1 className="text-2xl font-bold mt-1">
+            Bonjour {firstName || ''}.
+          </h1>
+        </div>
+        <Button size="sm" onClick={onNew}>
+          <Plus className="mr-1 h-3 w-3" /> Nouveau projet
+        </Button>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {[
+          { label: 'Projets actifs', value: active, hint: `${inReview} en revue`, icon: Folder },
+          { label: 'Findings ouvertes', value: '—', hint: 'à venir', icon: Bug },
+          { label: 'Heures engagées', value: '—', hint: 'à venir', icon: Clock },
+          { label: 'Rapports en cours', value: '—', hint: 'à venir', icon: FileText },
+        ].map((s) => {
+          const Icon = s.icon;
+          return (
+            <div key={s.label} className="rounded-xl bg-card p-4">
+              <div className="flex items-center gap-2 mb-2.5">
+                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {s.label}
+                </span>
+              </div>
+              <p className="text-2xl font-semibold tracking-tight font-mono">
+                {s.value}
+              </p>
+              {s.hint && (
+                <p className="text-xs text-muted-foreground mt-1">{s.hint}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Content grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4">
+        {/* Recent projects */}
+        <div className="rounded-xl bg-card">
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-sm font-medium">Projets récents</span>
+            <Button variant="ghost" size="sm" onClick={onAllProjects}>
+              Tout voir <ArrowRight className="ml-1 h-3 w-3" />
+            </Button>
+          </div>
           <div>
-            <div
-              className="mono"
-              style={{
-                fontSize: 11,
-                color: 'var(--fg-subtle)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
-            >
-              {today}
-            </div>
-            <h1
-              style={{
-                fontSize: 26,
-                fontWeight: 600,
-                letterSpacing: '-0.015em',
-                margin: '6px 0 0',
-              }}
-            >
-              Bonjour {firstName || ''}.
-            </h1>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className="btn">
-              <Filter size={13} /> Cette semaine
-            </button>
-            <button type="button" className="btn btn-primary" onClick={onNew}>
-              <Plus size={13} /> Nouveau projet
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-          <StatCard
-            label="Projets actifs"
-            value={active}
-            hint={`${inReview} en revue`}
-            icon={Folder}
-          />
-          <StatCard label="Findings ouvertes" value="—" hint="à venir" icon={Bug} />
-          <StatCard label="Heures engagées" value="—" hint="à venir" icon={Clock} />
-          <StatCard label="Rapports en cours" value="—" hint="à venir" icon={FileText} />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }}>
-          <div className="card-htg" style={{ overflow: 'hidden' }}>
-            <div
-              style={{
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                borderBottom: '1px solid var(--border-subtle)',
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Projets récents</span>
-              <button
-                type="button"
-                onClick={onAllProjects}
-                className="btn btn-ghost btn-sm"
-                style={{ marginLeft: 'auto' }}
-              >
-                Tout voir <ArrowRight size={12} />
-              </button>
-            </div>
             {loading && (
-              <div style={{ padding: 24, color: 'var(--fg-muted)', fontSize: 13 }}>
-                Chargement…
+              <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
               </div>
             )}
             {!loading && recent.length === 0 && (
-              <div style={{ padding: 24, color: 'var(--fg-muted)', fontSize: 13 }}>
+              <p className="p-6 text-sm text-muted-foreground">
                 Aucun projet pour l&apos;instant.
-              </div>
+              </p>
             )}
-            {recent.map((p, i) => {
+            {recent.map((p) => {
               const progress = progressFor(p);
               const team = (p.members || []).map((m) => ({
                 id: m.user.id,
@@ -391,98 +278,45 @@ function DashboardActive({
                 <div
                   key={p.id}
                   onClick={() => onOpen(p.id)}
-                  style={{
-                    padding: '12px 14px',
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 100px auto auto',
-                    gap: 14,
-                    alignItems: 'center',
-                    borderBottom:
-                      i < recent.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                    cursor: 'pointer',
-                    transition: 'background var(--dur-fast) var(--ease-out)',
-                  }}
-                  onMouseEnter={(e) =>
-                    ((e.currentTarget as HTMLDivElement).style.background = 'var(--bg-subtle)')
-                  }
-                  onMouseLeave={(e) =>
-                    ((e.currentTarget as HTMLDivElement).style.background = 'transparent')
-                  }
+                  className="grid grid-cols-[1fr_100px_auto_auto] gap-3.5 items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div className="mono" style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: 'var(--fg-subtle)',
-                        marginTop: 2,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium font-mono truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
                       {p.clientCompany} · {StatusPhase(p.status)}
-                    </div>
+                    </p>
                   </div>
-                  <div style={{ width: 100 }}>
-                    <div
-                      style={{
-                        height: 3,
-                        background: 'var(--bg-input)',
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                      }}
-                    >
+                  <div className="w-[100px]">
+                    <div className="h-[3px] bg-muted rounded-full overflow-hidden">
                       <div
-                        style={{
-                          height: '100%',
-                          width: `${progress}%`,
-                          background: 'var(--accent)',
-                        }}
+                        className="h-full bg-primary rounded-full"
+                        style={{ width: `${progress}%` }}
                       />
                     </div>
-                    <div
-                      className="mono"
-                      style={{ fontSize: 10.5, color: 'var(--fg-subtle)', marginTop: 3 }}
-                    >
+                    <p className="text-[10.5px] text-muted-foreground mt-1 font-mono">
                       {progress}%
-                    </div>
+                    </p>
                   </div>
-                  <div
-                    className="mono"
-                    style={{
-                      fontSize: 12,
-                      color: 'var(--fg-muted)',
-                      minWidth: 60,
-                      textAlign: 'right',
-                    }}
-                  >
+                  <p className="text-xs text-muted-foreground text-right min-w-[60px] font-mono">
                     {p._count?.scopes ?? 0}{' '}
-                    <span style={{ color: 'var(--fg-subtle)' }}>scopes</span>
-                  </div>
+                    <span className="text-muted-foreground/60">scopes</span>
+                  </p>
                   <AvatarStack users={team} max={3} />
                 </div>
               );
             })}
           </div>
+        </div>
 
-          <div className="card-htg" style={{ overflow: 'hidden' }}>
-            <div
-              style={{
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                borderBottom: '1px solid var(--border-subtle)',
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Activité récente</span>
-              <Activity
-                size={13}
-                style={{ color: 'var(--fg-subtle)', marginLeft: 'auto' }}
-              />
-            </div>
-            <div style={{ padding: 14, fontSize: 12.5, color: 'var(--fg-muted)' }}>
-              <Network size={14} style={{ marginRight: 6, color: 'var(--fg-subtle)' }} />
+        {/* Activity */}
+        <div className="rounded-xl bg-card">
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-sm font-medium">Activité récente</span>
+            <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <div className="px-4 pb-4">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Network className="h-3.5 w-3.5" />
               Le flux d&apos;activité collaboratif arrive bientôt.
             </div>
           </div>

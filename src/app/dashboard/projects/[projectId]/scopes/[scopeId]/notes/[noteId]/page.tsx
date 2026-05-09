@@ -161,7 +161,7 @@ export default function NoteEditorPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Top bar - minimal */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
+      <div className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
           <button
             onClick={() => router.push(`/dashboard/projects/${projectId}`)}
@@ -232,7 +232,7 @@ export default function NoteEditorPage() {
           />
 
           {/* Meta */}
-          <div className="flex items-center gap-3 text-sm text-muted-foreground mb-8 pb-8 border-b border-border/30">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground mb-8 pb-8">
             <span>
               {note.author.firstName} {note.author.lastName}
             </span>

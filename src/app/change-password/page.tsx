@@ -15,7 +15,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Shield, Loader2, AlertCircle, KeyRound } from 'lucide-react';
+import { Loader2, AlertCircle, KeyRound } from 'lucide-react';
+import { HtgLogo } from '@/components/ui/htg-logo';
 
 export default function ChangePasswordPage() {
   const { token, loginWithTokens, user, isLoading } = useAuth();
@@ -90,7 +91,7 @@ export default function ChangePasswordPage() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
-            <Shield className="h-7 w-7 text-primary-foreground" />
+            <HtgLogo size={28} />
           </div>
           <div className="text-center">
             <h1 className="text-3xl font-bold tracking-tight">HTGether</h1>

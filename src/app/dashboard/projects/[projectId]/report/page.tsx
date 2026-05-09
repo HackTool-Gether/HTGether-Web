@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Topbar } from '@/components/shell/topbar';
 import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -14,7 +13,9 @@ import {
   type Finding,
   type Report,
 } from '@/lib/api';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { Topbar } from '@/components/shell/topbar';
+import { ArrowLeft, FileText, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import {
   ReportProvider,
@@ -122,27 +123,28 @@ export default function ProjectReportPage() {
 
   if (loading) {
     return (
-      <>
-        <Topbar crumbs={[{ label: 'Rapport' }]} />
-        <div style={{ padding: 40, color: 'var(--fg-muted)' }}>Chargement…</div>
-      </>
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
   }
 
   return (
     <ReportProvider project={project} findings={findings}>
-      <Topbar
-        crumbs={[
-          { label: 'Projets' },
-          { label: project?.name || '…', mono: true },
-          { label: 'Rapport' },
-        ]}
-        actions={
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div className="flex-1 overflow-auto">
+        <div className="px-4 sm:px-8 pt-4 sm:pt-6 pb-4 max-w-[880px]">
+          {/* Header */}
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div>
+              <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground mb-1" onClick={() => router.push(`/dashboard/projects/${projectId}`)}>
+                <ArrowLeft className="h-3 w-3 mr-1" />
+                {project?.name || '…'}
+              </Button>
+              <h1 className="text-2xl font-bold">Rapport</h1>
+            </div>
             <span
-              className="mono"
+              className="font-mono text-[11px]"
               style={{
-                fontSize: 11,
                 color:
                   saveState === 'saving'
                     ? 'var(--fg-muted)'
@@ -157,25 +159,7 @@ export default function ProjectReportPage() {
               {saveState === 'saved' && '✓ enregistré'}
               {saveState === 'error' && 'erreur'}
             </span>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => router.push(`/dashboard/projects/${projectId}`)}
-            >
-              <ArrowLeft size={12} /> Retour
-            </button>
           </div>
-        }
-      />
-
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        <div
-          style={{
-            maxWidth: 880,
-            margin: '0 auto',
-            padding: '32px 48px 80px',
-          }}
-        >
           {/* Header */}
           <div style={{ marginBottom: 24 }}>
             <div
@@ -219,7 +203,6 @@ export default function ProjectReportPage() {
               style={{
                 padding: '8px 12px',
                 background: 'color-mix(in oklch, var(--sev-critical-fg) 10%, transparent)',
-                border: '1px solid color-mix(in oklch, var(--sev-critical-fg) 30%, transparent)',
                 color: 'var(--sev-critical-fg)',
                 borderRadius: 'var(--r-md)',
                 fontSize: 12.5,
@@ -234,8 +217,7 @@ export default function ProjectReportPage() {
           <div
             style={{
               padding: '24px 28px',
-              background: 'var(--bg)',
-              border: '1px solid var(--border-subtle)',
+              background: 'var(--bg-elevated)',
               borderRadius: 'var(--r-lg, 12px)',
               minHeight: 480,
             }}

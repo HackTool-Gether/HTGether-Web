@@ -4,18 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { setupApi, ApiError } from '@/lib/api';
 import type { OnboardingData } from '@/lib/api';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
@@ -25,7 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Shield,
   Loader2,
   AlertCircle,
   User,
@@ -42,14 +33,16 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { HtgLogo } from '@/components/ui/htg-logo';
 
 const STEPS = [
-  { id: 'admin', title: 'Compte Admin', icon: User },
-  { id: 'company', title: 'Entreprise', icon: Building2 },
-  { id: 'auth', title: 'Authentification', icon: KeyRound },
-  { id: 'ai', title: 'Module IA', icon: Brain },
-  { id: 'smtp', title: 'Email (SMTP)', icon: Mail },
-  { id: 'summary', title: 'Résumé', icon: CheckCircle2 },
+  { id: 'admin', title: 'Compte Admin', desc: 'Créez le premier administrateur de la plateforme', icon: User },
+  { id: 'company', title: 'Entreprise', desc: 'Renseignez les informations de votre organisation', icon: Building2 },
+  { id: 'auth', title: 'Authentification', desc: 'Configurez les modes de connexion disponibles', icon: KeyRound },
+  { id: 'ai', title: 'Module IA', desc: "Activez l'assistant IA pour la rédaction et l'analyse", icon: Brain },
+  { id: 'smtp', title: 'Email', desc: "Configurez l'envoi de notifications par email", icon: Mail },
+  { id: 'summary', title: 'Lancement', desc: 'Vérifiez et validez votre configuration', icon: CheckCircle2 },
 ] as const;
 
 const AI_PROVIDERS = [
@@ -67,19 +60,125 @@ const AUTH_OPTIONS = [
   { id: 'LDAP', name: 'LDAP / Active Directory', description: 'Authentification LDAP', icon: Server, needsConfig: true },
 ];
 
+const STEP_TITLES: Record<string, string> = {
+  admin: 'Créez votre compte administrateur',
+  company: 'Informations de votre entreprise',
+  auth: "Modes d'authentification",
+  ai: "Assistant IA",
+  smtp: "Configuration email",
+  summary: 'Tout est prêt',
+};
+
+const STEP_DESCRIPTIONS: Record<string, string> = {
+  admin: 'Ce compte sera le super administrateur de la plateforme. Vous pourrez créer d\'autres utilisateurs par la suite.',
+  company: 'Ces informations seront utilisées dans les rapports générés et le branding de la plateforme.',
+  auth: 'Choisissez comment vos utilisateurs pourront se connecter. Au moins un mode doit être activé.',
+  ai: "L'IA peut assister à la rédaction de findings, suggérer des remédiations et analyser les résultats.",
+  smtp: "Configurez un serveur email pour les notifications et les invitations d'utilisateurs.",
+  summary: 'Vérifiez votre configuration avant de lancer la plateforme.',
+};
+
+function SidebarStep({ icon: Icon, title, desc, active, completed, isLast, onClick }: {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  active: boolean;
+  completed: boolean;
+  isLast: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        gap: 0,
+        width: '100%',
+        padding: 0,
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        textAlign: 'left',
+        fontFamily: 'inherit',
+      }}
+    >
+      {/* Icon column with connector line */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 32, flexShrink: 0 }}>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            background: completed ? 'rgba(39, 166, 68, 0.15)' : active ? 'var(--accent)' : 'var(--bg-subtle)',
+            border: `2px solid ${completed ? '#27a644' : active ? 'var(--accent)' : 'var(--border)'}`,
+            transition: 'all 0.2s',
+          }}
+        >
+          {completed ? (
+            <Check size={14} strokeWidth={2.5} style={{ color: '#27a644' }} />
+          ) : (
+            <Icon size={14} style={{ color: active ? 'var(--accent-fg)' : 'var(--fg-subtle)' }} />
+          )}
+        </div>
+        {!isLast && (
+          <div style={{
+            width: 2,
+            flex: 1,
+            minHeight: 12,
+            background: completed ? '#27a644' : 'var(--border)',
+            transition: 'background 0.2s',
+          }} />
+        )}
+      </div>
+
+      {/* Text */}
+      <div style={{ minWidth: 0, paddingLeft: 12, paddingBottom: isLast ? 0 : 20 }}>
+        <div style={{
+          fontSize: 13,
+          fontWeight: active || completed ? 600 : 400,
+          color: active ? 'var(--fg)' : completed ? 'var(--fg)' : 'var(--fg-subtle)',
+          lineHeight: 1.3,
+          marginTop: 6,
+        }}>
+          {title}
+        </div>
+        <div style={{
+          fontSize: 12,
+          color: active ? 'var(--fg-muted)' : 'var(--fg-subtle)',
+          lineHeight: 1.45,
+          marginTop: 3,
+        }}>
+          {desc}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function FieldGroup({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Label style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>{label}</Label>
+      {children}
+      {hint && <p style={{ fontSize: 12, color: 'var(--fg-subtle)', margin: 0 }}>{hint}</p>}
+    </div>
+  );
+}
+
 export default function SetupPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Admin state
   const [admin, setAdmin] = useState({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '' });
-
-  // Company state
   const [company, setCompany] = useState({ name: '', domain: '' });
-
-  // Auth state
   const [authProviders, setAuthProviders] = useState<Record<string, { enabled: boolean; config: Record<string, any> }>>({
     LOCAL: { enabled: true, config: {} },
     GOOGLE: { enabled: false, config: {} },
@@ -87,25 +186,13 @@ export default function SetupPage() {
     AZURE_AD: { enabled: false, config: {} },
     LDAP: { enabled: false, config: {} },
   });
-
-  // AI state
   const [ai, setAi] = useState({ enabled: false, provider: '', apiKey: '', model: '' });
-
-  // Email state
   const [emailProvider, setEmailProvider] = useState<'none' | 'smtp' | 'mailgun'>('none');
-  const [smtp, setSmtp] = useState({
-    host: '', port: 587, user: '', password: '', fromEmail: '', fromName: '', secure: false,
-  });
-  const [mailgun, setMailgun] = useState({
-    apiKey: '', domain: '', fromEmail: '', fromName: '',
-  });
-
-  // Copy state for callback URL
+  const [smtp, setSmtp] = useState({ host: '', port: 587, user: '', password: '', fromEmail: '', fromName: '', secure: false });
+  const [mailgun, setMailgun] = useState({ apiKey: '', domain: '', fromEmail: '', fromName: '' });
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const callbackUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/login`
-    : 'https://your-domain.com/login';
+  const callbackUrl = typeof window !== 'undefined' ? `${window.location.origin}/login` : '';
 
   const copyCallbackUrl = async (providerId: string) => {
     await navigator.clipboard.writeText(callbackUrl);
@@ -119,87 +206,40 @@ export default function SetupPage() {
     setError('');
     switch (currentStep.id) {
       case 'admin':
-        if (!admin.email || !admin.password || !admin.firstName || !admin.lastName) {
-          setError('Tous les champs sont obligatoires');
-          return false;
-        }
-        if (admin.password.length < 8) {
-          setError('Le mot de passe doit contenir au moins 8 caractères');
-          return false;
-        }
-        if (admin.password !== admin.confirmPassword) {
-          setError('Les mots de passe ne correspondent pas');
-          return false;
-        }
+        if (!admin.email || !admin.password || !admin.firstName || !admin.lastName) { setError('Tous les champs sont obligatoires'); return false; }
+        if (admin.password.length < 8) { setError('Le mot de passe doit contenir au moins 8 caractères'); return false; }
+        if (admin.password !== admin.confirmPassword) { setError('Les mots de passe ne correspondent pas'); return false; }
         return true;
       case 'company':
-        if (!company.name) {
-          setError("Le nom de l'entreprise est obligatoire");
-          return false;
-        }
+        if (!company.name) { setError("Le nom de l'entreprise est obligatoire"); return false; }
         return true;
-      case 'auth': {
-        const hasAtLeastOne = Object.values(authProviders).some((p) => p.enabled);
-        if (!hasAtLeastOne) {
-          setError("Au moins un mode d'authentification doit être activé");
-          return false;
-        }
+      case 'auth':
+        if (!Object.values(authProviders).some((p) => p.enabled)) { setError("Au moins un mode d'authentification doit être activé"); return false; }
         return true;
-      }
       case 'ai':
-        if (ai.enabled && (!ai.provider || !ai.apiKey)) {
-          setError('Sélectionnez un provider et entrez votre clé API');
-          return false;
-        }
+        if (ai.enabled && (!ai.provider || !ai.apiKey)) { setError('Sélectionnez un provider et entrez votre clé API'); return false; }
         return true;
-      default:
-        return true;
+      default: return true;
     }
   };
 
-  const handleNext = () => {
-    if (validateStep()) {
-      setStep((s) => Math.min(s + 1, STEPS.length - 1));
-    }
+  const goTo = (target: number) => {
+    if (target < step) { setError(''); setStep(target); }
   };
 
-  const handleBack = () => {
-    setError('');
-    setStep((s) => Math.max(s - 1, 0));
-  };
+  const handleNext = () => { if (validateStep()) setStep((s) => Math.min(s + 1, STEPS.length - 1)); };
+  const handleBack = () => { setError(''); setStep((s) => Math.max(s - 1, 0)); };
 
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
-
     const data: OnboardingData = {
-      admin: {
-        email: admin.email,
-        password: admin.password,
-        firstName: admin.firstName,
-        lastName: admin.lastName,
-      },
+      admin: { email: admin.email, password: admin.password, firstName: admin.firstName, lastName: admin.lastName },
       company: { name: company.name, domain: company.domain || undefined },
-      auth: {
-        providers: Object.entries(authProviders).map(([type, { enabled, config }]) => ({
-          type,
-          enabled,
-          config,
-        })),
-      },
-      ai: {
-        enabled: ai.enabled,
-        provider: ai.provider || undefined,
-        apiKey: ai.apiKey || undefined,
-        model: ai.model || undefined,
-      },
-      smtp: emailProvider === 'smtp'
-        ? { enabled: true, provider: 'smtp', ...smtp }
-        : emailProvider === 'mailgun'
-          ? { enabled: true, provider: 'mailgun', ...mailgun }
-          : { enabled: false },
+      auth: { providers: Object.entries(authProviders).map(([type, { enabled, config }]) => ({ type, enabled, config })) },
+      ai: { enabled: ai.enabled, provider: ai.provider || undefined, apiKey: ai.apiKey || undefined, model: ai.model || undefined },
+      smtp: emailProvider === 'smtp' ? { enabled: true, provider: 'smtp', ...smtp } : emailProvider === 'mailgun' ? { enabled: true, provider: 'mailgun', ...mailgun } : { enabled: false },
     };
-
     try {
       await setupApi.onboarding(data);
       router.push('/login');
@@ -211,286 +251,252 @@ export default function SetupPage() {
   };
 
   const toggleAuthProvider = (id: string) => {
-    setAuthProviders((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], enabled: !prev[id].enabled },
-    }));
+    setAuthProviders((prev) => ({ ...prev, [id]: { ...prev[id], enabled: !prev[id].enabled } }));
+  };
+  const updateAuthConfig = (id: string, key: string, value: string) => {
+    setAuthProviders((prev) => ({ ...prev, [id]: { ...prev[id], config: { ...prev[id].config, [key]: value } } }));
   };
 
-  const updateAuthConfig = (id: string, key: string, value: string) => {
-    setAuthProviders((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], config: { ...prev[id].config, [key]: value } },
-    }));
-  };
+  const inputClass = "h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-2xl space-y-8">
-        {/* Header */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
-            <Shield className="h-7 w-7 text-primary-foreground" />
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+      {/* Left sidebar — Steps */}
+      <div
+        style={{
+          width: 300,
+          flexShrink: 0,
+          borderRight: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '24px 16px',
+        }}
+      >
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', marginBottom: 8 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 'var(--r-lg)',
+              background: 'var(--accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <HtgLogo size={16} />
           </div>
-          <div className="text-center">
-            <h1 className="text-3xl font-bold tracking-tight">Configuration initiale</h1>
-            <p className="text-sm text-muted-foreground">
-              Configurez votre plateforme HTGether en quelques étapes
-            </p>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.02em' }}>HTGether</div>
+            <div style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>Configuration initiale</div>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="flex items-center gap-1">
+        {/* Info banner */}
+        <div style={{
+          margin: '16px 14px 20px',
+          padding: '10px 12px',
+          background: 'var(--bg-elevated)',
+          borderRadius: 'var(--r-lg)',
+          border: '1px solid var(--border)',
+          fontSize: 12,
+          color: 'var(--fg-muted)',
+          lineHeight: 1.5,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}>
+          <AlertCircle size={14} style={{ color: 'var(--fg-subtle)', flexShrink: 0, marginTop: 1 }} />
+          Configurez votre plateforme en quelques étapes.
+        </div>
+
+        {/* Steps */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, padding: '0 14px' }}>
           {STEPS.map((s, i) => (
-            <div key={s.id} className="flex flex-1 flex-col items-center gap-1.5">
-              <div
-                className={`h-1.5 w-full rounded-full transition-colors ${
-                  i <= step ? 'bg-primary' : 'bg-muted'
-                }`}
-              />
-              <span className={`text-xs ${i <= step ? 'text-foreground' : 'text-muted-foreground'}`}>
-                {s.title}
-              </span>
-            </div>
+            <SidebarStep
+              key={s.id}
+              icon={s.icon}
+              title={s.title}
+              desc={s.desc}
+              active={i === step}
+              completed={i < step}
+              isLast={i === STEPS.length - 1}
+              onClick={() => goTo(i)}
+            />
           ))}
         </div>
+      </div>
 
-        {/* Step content */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${step < STEPS.length - 1 ? 'bg-primary/10' : 'bg-green-500/10'}`}>
-                <currentStep.icon className={`h-5 w-5 ${step < STEPS.length - 1 ? 'text-primary' : 'text-green-500'}`} />
-              </div>
-              <div>
-                <CardTitle>{currentStep.title}</CardTitle>
-                <CardDescription>
-                  {currentStep.id === 'admin' && 'Créez votre compte administrateur'}
-                  {currentStep.id === 'company' && 'Informations de votre entreprise'}
-                  {currentStep.id === 'auth' && 'Choisissez les modes de connexion'}
-                  {currentStep.id === 'ai' && "Configurez l'assistant IA"}
-                  {currentStep.id === 'smtp' && "Configurez l'envoi d'emails"}
-                  {currentStep.id === 'summary' && 'Vérifiez votre configuration'}
-                </CardDescription>
-              </div>
+      {/* Right content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Content area */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '48px 56px' }}>
+          <div style={{ maxWidth: 560 }}>
+            {/* Step label */}
+            <div style={{
+              fontSize: 12,
+              fontWeight: 500,
+              color: 'var(--accent)',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              marginBottom: 8,
+            }}>
+              {step < STEPS.length - 1 ? `Etape ${step + 1} sur ${STEPS.length}` : 'Derniere etape'}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+
+            {/* Title */}
+            <h1 style={{
+              fontSize: 28,
+              fontWeight: 600,
+              letterSpacing: '-0.025em',
+              lineHeight: 1.15,
+              color: 'var(--fg)',
+              margin: '0 0 8px',
+            }}>
+              {STEP_TITLES[currentStep.id]}
+            </h1>
+
+            {/* Description */}
+            <p style={{
+              fontSize: 14,
+              color: 'var(--fg-subtle)',
+              lineHeight: 1.6,
+              margin: '0 0 32px',
+            }}>
+              {STEP_DESCRIPTIONS[currentStep.id]}
+            </p>
+
+            {/* Error */}
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" style={{ marginBottom: 24 }}>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
-            {/* Step: Admin */}
+            {/* ==================== ADMIN ==================== */}
             {currentStep.id === 'admin' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Prénom</Label>
-                    <Input
-                      id="firstName"
-                      value={admin.firstName}
-                      onChange={(e) => setAdmin({ ...admin, firstName: e.target.value })}
-                      placeholder="Jean"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Nom</Label>
-                    <Input
-                      id="lastName"
-                      value={admin.lastName}
-                      onChange={(e) => setAdmin({ ...admin, lastName: e.target.value })}
-                      placeholder="Dupont"
-                      required
-                    />
-                  </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <FieldGroup label="Prénom">
+                    <Input value={admin.firstName} onChange={(e) => setAdmin({ ...admin, firstName: e.target.value })} placeholder="Jean" className={inputClass} />
+                  </FieldGroup>
+                  <FieldGroup label="Nom">
+                    <Input value={admin.lastName} onChange={(e) => setAdmin({ ...admin, lastName: e.target.value })} placeholder="Dupont" className={inputClass} />
+                  </FieldGroup>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={admin.email}
-                    onChange={(e) => setAdmin({ ...admin, email: e.target.value })}
-                    placeholder="admin@entreprise.com"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Mot de passe</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={admin.password}
-                      onChange={(e) => setAdmin({ ...admin, password: e.target.value })}
-                      placeholder="••••••••"
-                      minLength={8}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirmer</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={admin.confirmPassword}
-                      onChange={(e) => setAdmin({ ...admin, confirmPassword: e.target.value })}
-                      placeholder="••••••••"
-                      minLength={8}
-                      required
-                    />
-                  </div>
+                <FieldGroup label="Email">
+                  <Input type="email" value={admin.email} onChange={(e) => setAdmin({ ...admin, email: e.target.value })} placeholder="admin@entreprise.com" className={inputClass} />
+                </FieldGroup>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <FieldGroup label="Mot de passe">
+                    <Input type="password" value={admin.password} onChange={(e) => setAdmin({ ...admin, password: e.target.value })} placeholder="••••••••" className={inputClass} />
+                  </FieldGroup>
+                  <FieldGroup label="Confirmer">
+                    <Input type="password" value={admin.confirmPassword} onChange={(e) => setAdmin({ ...admin, confirmPassword: e.target.value })} placeholder="••••••••" className={inputClass} />
+                  </FieldGroup>
                 </div>
               </div>
             )}
 
-            {/* Step: Company */}
+            {/* ==================== COMPANY ==================== */}
             {currentStep.id === 'company' && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Nom de l&apos;entreprise</Label>
-                  <Input
-                    id="companyName"
-                    value={company.name}
-                    onChange={(e) => setCompany({ ...company, name: e.target.value })}
-                    placeholder="CyberSec Corp"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="companyDomain">Domaine (optionnel)</Label>
-                  <Input
-                    id="companyDomain"
-                    value={company.domain}
-                    onChange={(e) => setCompany({ ...company, domain: e.target.value })}
-                    placeholder="cybersec-corp.com"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Utilisé pour le branding des rapports
-                  </p>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <FieldGroup label="Nom de l'entreprise">
+                  <Input value={company.name} onChange={(e) => setCompany({ ...company, name: e.target.value })} placeholder="CyberSec Corp" className={inputClass} />
+                </FieldGroup>
+                <FieldGroup label="Domaine (optionnel)" hint="Utilisé pour le branding des rapports">
+                  <Input value={company.domain} onChange={(e) => setCompany({ ...company, domain: e.target.value })} placeholder="cybersec-corp.com" className={inputClass} />
+                </FieldGroup>
               </div>
             )}
 
-            {/* Step: Auth */}
+            {/* ==================== AUTH ==================== */}
             {currentStep.id === 'auth' && (
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {AUTH_OPTIONS.map((opt) => {
                   const provider = authProviders[opt.id];
                   const Icon = opt.icon;
                   return (
-                    <div key={opt.id} className="rounded-lg border p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Icon className="h-5 w-5 text-muted-foreground" />
+                    <div
+                      key={opt.id}
+                      style={{
+                        background: 'var(--bg-elevated)',
+                        border: `1px solid ${provider.enabled ? 'rgba(94, 106, 210, 0.25)' : 'var(--border)'}`,
+                        borderRadius: 'var(--r-lg)',
+                        padding: 16,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{
+                            width: 32, height: 32, borderRadius: 'var(--r-md)',
+                            background: provider.enabled ? 'var(--accent-tint)' : 'var(--bg-subtle)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <Icon size={15} style={{ color: provider.enabled ? 'var(--accent-hover)' : 'var(--fg-subtle)' }} />
+                          </div>
                           <div>
-                            <p className="font-medium text-sm">{opt.name}</p>
-                            <p className="text-xs text-muted-foreground">{opt.description}</p>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{opt.name}</div>
+                            <div style={{ fontSize: 12, color: 'var(--fg-subtle)' }}>{opt.description}</div>
                           </div>
                         </div>
-                        <Switch
-                          checked={provider.enabled}
-                          onCheckedChange={() => toggleAuthProvider(opt.id)}
-                        />
+                        <Switch checked={provider.enabled} onCheckedChange={() => toggleAuthProvider(opt.id)} />
                       </div>
 
-                      {/* Config fields for SSO providers */}
                       {provider.enabled && opt.needsConfig && opt.id !== 'LDAP' && (
-                        <div className="space-y-3 pt-2 border-t">
-                          {/* Callback URL */}
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Callback URL (à copier dans la console {opt.name})</Label>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 rounded-md border bg-muted/50 px-3 py-1.5 text-xs font-mono text-muted-foreground select-all truncate">
-                                {callbackUrl}
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-2 shrink-0"
-                                onClick={() => copyCallbackUrl(opt.id)}
+                        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          <div>
+                            <Label style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>Callback URL</Label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                              <div style={{
+                                flex: 1, padding: '6px 10px', background: 'var(--bg-subtle)',
+                                border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                                fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--fg-subtle)',
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              }}>{callbackUrl}</div>
+                              <button
+                                type="button" onClick={() => copyCallbackUrl(opt.id)}
+                                style={{
+                                  width: 32, height: 32, borderRadius: 'var(--r-md)',
+                                  background: 'var(--bg-subtle)', border: '1px solid var(--border)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer', flexShrink: 0, color: 'var(--fg-subtle)',
+                                }}
                               >
-                                {copiedId === opt.id ? (
-                                  <Check className="h-3.5 w-3.5 text-green-500" />
-                                ) : (
-                                  <Copy className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
+                                {copiedId === opt.id ? <Check size={13} style={{ color: '#27a644' }} /> : <Copy size={13} />}
+                              </button>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-xs">Client ID</Label>
-                              <Input
-                                value={provider.config.clientId || ''}
-                                onChange={(e) => updateAuthConfig(opt.id, 'clientId', e.target.value)}
-                                placeholder="Votre Client ID"
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Client Secret</Label>
-                              <Input
-                                type="password"
-                                value={provider.config.clientSecret || ''}
-                                onChange={(e) => updateAuthConfig(opt.id, 'clientSecret', e.target.value)}
-                                placeholder="Votre Client Secret"
-                                className="h-8 text-sm"
-                              />
-                            </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <FieldGroup label="Client ID">
+                              <Input value={provider.config.clientId || ''} onChange={(e) => updateAuthConfig(opt.id, 'clientId', e.target.value)} placeholder="Client ID" className={inputClass} />
+                            </FieldGroup>
+                            <FieldGroup label="Client Secret">
+                              <Input type="password" value={provider.config.clientSecret || ''} onChange={(e) => updateAuthConfig(opt.id, 'clientSecret', e.target.value)} placeholder="Client Secret" className={inputClass} />
+                            </FieldGroup>
                           </div>
                         </div>
                       )}
 
-                      {/* LDAP config */}
                       {provider.enabled && opt.id === 'LDAP' && (
-                        <div className="space-y-3 pt-2 border-t">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-xs">URL du serveur</Label>
-                              <Input
-                                value={provider.config.url || ''}
-                                onChange={(e) => updateAuthConfig(opt.id, 'url', e.target.value)}
-                                placeholder="ldap://ldap.entreprise.com"
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Base DN</Label>
-                              <Input
-                                value={provider.config.baseDn || ''}
-                                onChange={(e) => updateAuthConfig(opt.id, 'baseDn', e.target.value)}
-                                placeholder="dc=entreprise,dc=com"
-                                className="h-8 text-sm"
-                              />
-                            </div>
+                        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <FieldGroup label="URL du serveur">
+                              <Input value={provider.config.url || ''} onChange={(e) => updateAuthConfig(opt.id, 'url', e.target.value)} placeholder="ldap://ldap.entreprise.com" className={inputClass} />
+                            </FieldGroup>
+                            <FieldGroup label="Base DN">
+                              <Input value={provider.config.baseDn || ''} onChange={(e) => updateAuthConfig(opt.id, 'baseDn', e.target.value)} placeholder="dc=entreprise,dc=com" className={inputClass} />
+                            </FieldGroup>
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-xs">Bind DN (optionnel)</Label>
-                              <Input
-                                value={provider.config.bindDn || ''}
-                                onChange={(e) => updateAuthConfig(opt.id, 'bindDn', e.target.value)}
-                                placeholder="cn=admin,dc=..."
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Bind Password</Label>
-                              <Input
-                                type="password"
-                                value={provider.config.bindPassword || ''}
-                                onChange={(e) => updateAuthConfig(opt.id, 'bindPassword', e.target.value)}
-                                placeholder="••••••••"
-                                className="h-8 text-sm"
-                              />
-                            </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <FieldGroup label="Bind DN (optionnel)">
+                              <Input value={provider.config.bindDn || ''} onChange={(e) => updateAuthConfig(opt.id, 'bindDn', e.target.value)} placeholder="cn=admin,dc=..." className={inputClass} />
+                            </FieldGroup>
+                            <FieldGroup label="Bind Password">
+                              <Input type="password" value={provider.config.bindPassword || ''} onChange={(e) => updateAuthConfig(opt.id, 'bindPassword', e.target.value)} placeholder="••••••••" className={inputClass} />
+                            </FieldGroup>
                           </div>
                         </div>
                       )}
@@ -500,57 +506,50 @@ export default function SetupPage() {
               </div>
             )}
 
-            {/* Step: AI */}
+            {/* ==================== AI ==================== */}
             {currentStep.id === 'ai' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-lg border p-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-lg)', padding: 16,
+                }}>
                   <div>
-                    <p className="font-medium">Activer le module IA</p>
-                    <p className="text-sm text-muted-foreground">
-                      Assistance à la rédaction, suggestions de remédiation, analyse
-                    </p>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Activer le module IA</div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-subtle)', marginTop: 2 }}>Assistance, suggestions de remédiation, analyse</div>
                   </div>
-                  <Switch
-                    checked={ai.enabled}
-                    onCheckedChange={(checked) => setAi({ ...ai, enabled: checked })}
-                  />
+                  <Switch checked={ai.enabled} onCheckedChange={(checked) => setAi({ ...ai, enabled: checked })} />
                 </div>
 
                 {ai.enabled && (
                   <>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                       {AI_PROVIDERS.map((provider) => (
                         <button
                           key={provider.id}
+                          type="button"
                           onClick={() => setAi({ ...ai, provider: provider.id, model: provider.models[0] })}
-                          className={`rounded-lg border p-4 text-left transition-colors ${
-                            ai.provider === provider.id
-                              ? 'border-primary bg-primary/5'
-                              : 'hover:border-muted-foreground/30'
-                          }`}
+                          style={{
+                            padding: 16, textAlign: 'left', borderRadius: 'var(--r-lg)',
+                            background: ai.provider === provider.id ? 'var(--accent-tint)' : 'var(--bg-elevated)',
+                            border: `1px solid ${ai.provider === provider.id ? 'rgba(94, 106, 210, 0.30)' : 'var(--border)'}`,
+                            cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+                          }}
                         >
-                          <p className="font-medium text-sm">{provider.name}</p>
-                          <p className="text-xs text-muted-foreground">{provider.description}</p>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{provider.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--fg-subtle)', marginTop: 2 }}>{provider.description}</div>
                         </button>
                       ))}
                     </div>
 
                     {ai.provider && (
-                      <div className="space-y-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="apiKey">Clé API</Label>
-                          <Input
-                            id="apiKey"
-                            type="password"
-                            value={ai.apiKey}
-                            onChange={(e) => setAi({ ...ai, apiKey: e.target.value })}
-                            placeholder={`Votre clé API ${AI_PROVIDERS.find((p) => p.id === ai.provider)?.name}`}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Modèle</Label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <FieldGroup label="Clé API">
+                          <Input type="password" value={ai.apiKey} onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} placeholder={`Clé API ${AI_PROVIDERS.find((p) => p.id === ai.provider)?.name}`} className={inputClass} />
+                        </FieldGroup>
+                        <FieldGroup label="Modèle">
                           <Select value={ai.model} onValueChange={(val) => { if (val) setAi({ ...ai, model: val }); }}>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full h-10">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -559,7 +558,7 @@ export default function SetupPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                        </div>
+                        </FieldGroup>
                       </div>
                     )}
                   </>
@@ -567,255 +566,170 @@ export default function SetupPage() {
               </div>
             )}
 
-            {/* Step: Email */}
+            {/* ==================== EMAIL ==================== */}
             {currentStep.id === 'smtp' && (
-              <div className="space-y-4">
-                {/* Provider selection */}
-                <div className="grid grid-cols-3 gap-3">
-                  <button
-                    onClick={() => setEmailProvider('none')}
-                    className={`rounded-lg border p-4 text-center transition-colors ${
-                      emailProvider === 'none'
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:border-muted-foreground/30'
-                    }`}
-                  >
-                    <p className="font-medium text-sm">Désactivé</p>
-                    <p className="text-xs text-muted-foreground">Pas d&apos;email</p>
-                  </button>
-                  <button
-                    onClick={() => setEmailProvider('smtp')}
-                    className={`rounded-lg border p-4 text-center transition-colors ${
-                      emailProvider === 'smtp'
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:border-muted-foreground/30'
-                    }`}
-                  >
-                    <p className="font-medium text-sm">SMTP</p>
-                    <p className="text-xs text-muted-foreground">Serveur classique</p>
-                  </button>
-                  <button
-                    onClick={() => setEmailProvider('mailgun')}
-                    className={`rounded-lg border p-4 text-center transition-colors ${
-                      emailProvider === 'mailgun'
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:border-muted-foreground/30'
-                    }`}
-                  >
-                    <p className="font-medium text-sm">Mailgun</p>
-                    <p className="text-xs text-muted-foreground">API Mailgun</p>
-                  </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                  {([['none', 'Désactivé', "Pas d'email"], ['smtp', 'SMTP', 'Serveur classique'], ['mailgun', 'Mailgun', 'API Mailgun']] as const).map(([id, name, desc]) => (
+                    <button
+                      key={id} type="button" onClick={() => setEmailProvider(id)}
+                      style={{
+                        padding: 16, textAlign: 'center', borderRadius: 'var(--r-lg)',
+                        background: emailProvider === id ? 'var(--accent-tint)' : 'var(--bg-elevated)',
+                        border: `1px solid ${emailProvider === id ? 'rgba(94, 106, 210, 0.30)' : 'var(--border)'}`,
+                        cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--fg-subtle)', marginTop: 2 }}>{desc}</div>
+                    </button>
+                  ))}
                 </div>
 
-                {/* SMTP config */}
                 {emailProvider === 'smtp' && (
-                  <div className="space-y-3 rounded-lg border p-4">
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="col-span-2 space-y-1">
-                        <Label className="text-xs">Serveur SMTP</Label>
-                        <Input
-                          value={smtp.host}
-                          onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
-                          placeholder="smtp.gmail.com"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Port</Label>
-                        <Input
-                          type="number"
-                          value={smtp.port}
-                          onChange={(e) => setSmtp({ ...smtp, port: parseInt(e.target.value) || 587 })}
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', gap: 16,
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-lg)', padding: 20,
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                      <FieldGroup label="Serveur SMTP"><Input value={smtp.host} onChange={(e) => setSmtp({ ...smtp, host: e.target.value })} placeholder="smtp.gmail.com" className={inputClass} /></FieldGroup>
+                      <FieldGroup label="Port"><Input type="number" value={smtp.port} onChange={(e) => setSmtp({ ...smtp, port: parseInt(e.target.value) || 587 })} className={inputClass} /></FieldGroup>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Utilisateur</Label>
-                        <Input
-                          value={smtp.user}
-                          onChange={(e) => setSmtp({ ...smtp, user: e.target.value })}
-                          placeholder="user@gmail.com"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Mot de passe</Label>
-                        <Input
-                          type="password"
-                          value={smtp.password}
-                          onChange={(e) => setSmtp({ ...smtp, password: e.target.value })}
-                          placeholder="••••••••"
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <FieldGroup label="Utilisateur"><Input value={smtp.user} onChange={(e) => setSmtp({ ...smtp, user: e.target.value })} placeholder="user@gmail.com" className={inputClass} /></FieldGroup>
+                      <FieldGroup label="Mot de passe"><Input type="password" value={smtp.password} onChange={(e) => setSmtp({ ...smtp, password: e.target.value })} placeholder="••••••••" className={inputClass} /></FieldGroup>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Email expéditeur</Label>
-                        <Input
-                          value={smtp.fromEmail}
-                          onChange={(e) => setSmtp({ ...smtp, fromEmail: e.target.value })}
-                          placeholder="noreply@entreprise.com"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Nom expéditeur</Label>
-                        <Input
-                          value={smtp.fromName}
-                          onChange={(e) => setSmtp({ ...smtp, fromName: e.target.value })}
-                          placeholder="HTGether"
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <FieldGroup label="Email expéditeur"><Input value={smtp.fromEmail} onChange={(e) => setSmtp({ ...smtp, fromEmail: e.target.value })} placeholder="noreply@entreprise.com" className={inputClass} /></FieldGroup>
+                      <FieldGroup label="Nom expéditeur"><Input value={smtp.fromName} onChange={(e) => setSmtp({ ...smtp, fromName: e.target.value })} placeholder="HTGether" className={inputClass} /></FieldGroup>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="smtpSecure"
-                        checked={smtp.secure}
-                        onCheckedChange={(checked) => setSmtp({ ...smtp, secure: checked === true })}
-                      />
-                      <Label htmlFor="smtpSecure" className="text-sm">Connexion SSL/TLS</Label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Checkbox id="smtpSecure" checked={smtp.secure} onCheckedChange={(checked) => setSmtp({ ...smtp, secure: checked === true })} />
+                      <Label htmlFor="smtpSecure" style={{ fontSize: 13 }}>Connexion SSL/TLS</Label>
                     </div>
                   </div>
                 )}
 
-                {/* Mailgun config */}
                 {emailProvider === 'mailgun' && (
-                  <div className="space-y-3 rounded-lg border p-4">
-                    <div className="space-y-1">
-                      <Label className="text-xs">API Key</Label>
-                      <Input
-                        type="password"
-                        value={mailgun.apiKey}
-                        onChange={(e) => setMailgun({ ...mailgun, apiKey: e.target.value })}
-                        placeholder="key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Domaine Mailgun</Label>
-                      <Input
-                        value={mailgun.domain}
-                        onChange={(e) => setMailgun({ ...mailgun, domain: e.target.value })}
-                        placeholder="mg.domain.com"
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Email expéditeur</Label>
-                        <Input
-                          value={mailgun.fromEmail}
-                          onChange={(e) => setMailgun({ ...mailgun, fromEmail: e.target.value })}
-                          placeholder="no-reply@domain.com"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Nom expéditeur</Label>
-                        <Input
-                          value={mailgun.fromName}
-                          onChange={(e) => setMailgun({ ...mailgun, fromName: e.target.value })}
-                          placeholder="HTGether"
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', gap: 16,
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-lg)', padding: 20,
+                  }}>
+                    <FieldGroup label="API Key"><Input type="password" value={mailgun.apiKey} onChange={(e) => setMailgun({ ...mailgun, apiKey: e.target.value })} placeholder="key-xxxxxxxx" className={inputClass} /></FieldGroup>
+                    <FieldGroup label="Domaine Mailgun"><Input value={mailgun.domain} onChange={(e) => setMailgun({ ...mailgun, domain: e.target.value })} placeholder="mg.domain.com" className={inputClass} /></FieldGroup>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <FieldGroup label="Email expéditeur"><Input value={mailgun.fromEmail} onChange={(e) => setMailgun({ ...mailgun, fromEmail: e.target.value })} placeholder="no-reply@domain.com" className={inputClass} /></FieldGroup>
+                      <FieldGroup label="Nom expéditeur"><Input value={mailgun.fromName} onChange={(e) => setMailgun({ ...mailgun, fromName: e.target.value })} placeholder="HTGether" className={inputClass} /></FieldGroup>
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Step: Summary */}
+            {/* ==================== SUMMARY ==================== */}
             {currentStep.id === 'summary' && (
-              <div className="space-y-4">
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Administrateur</p>
-                  <p className="text-sm">{admin.firstName} {admin.lastName} — {admin.email}</p>
-                </div>
-
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Entreprise</p>
-                  <p className="text-sm">{company.name}{company.domain ? ` (${company.domain})` : ''}</p>
-                </div>
-
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Authentification</p>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {Object.entries(authProviders)
-                      .filter(([, v]) => v.enabled)
-                      .map(([k]) => {
-                        const opt = AUTH_OPTIONS.find((o) => o.id === k);
-                        return (
-                          <span key={k} className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                            {opt?.name || k}
-                          </span>
-                        );
-                      })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { label: 'Administrateur', value: `${admin.firstName} ${admin.lastName} — ${admin.email}` },
+                  { label: 'Entreprise', value: `${company.name}${company.domain ? ` (${company.domain})` : ''}` },
+                  { label: 'Authentification', value: null, tags: Object.entries(authProviders).filter(([, v]) => v.enabled).map(([k]) => AUTH_OPTIONS.find((o) => o.id === k)?.name || k) },
+                  { label: 'Module IA', value: ai.enabled ? `${AI_PROVIDERS.find((p) => p.id === ai.provider)?.name} — ${ai.model}` : 'Désactivé' },
+                  { label: 'Email', value: emailProvider === 'smtp' ? `SMTP — ${smtp.host}:${smtp.port}` : emailProvider === 'mailgun' ? `Mailgun — ${mailgun.domain}` : 'Non configuré' },
+                ].map((item) => (
+                  <div key={item.label} style={{
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-lg)', padding: '14px 16px',
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-subtle)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                      {item.label}
+                    </div>
+                    {item.tags ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {item.tags.map((tag) => (
+                          <span key={tag} style={{
+                            display: 'inline-flex', alignItems: 'center', padding: '2px 10px',
+                            borderRadius: 'var(--r-full)', fontSize: 12, fontWeight: 500,
+                            background: 'var(--accent-tint)', color: 'var(--accent-hover)',
+                          }}>{tag}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 13, color: item.value === 'Désactivé' || item.value === 'Non configuré' ? 'var(--fg-subtle)' : 'var(--fg)' }}>
+                        {item.value}
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Module IA</p>
-                  {ai.enabled ? (
-                    <p className="text-sm">
-                      {AI_PROVIDERS.find((p) => p.id === ai.provider)?.name} — {ai.model}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Désactivé</p>
-                  )}
-                </div>
-
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Email</p>
-                  {emailProvider === 'smtp' ? (
-                    <p className="text-sm">SMTP — {smtp.host}:{smtp.port}</p>
-                  ) : emailProvider === 'mailgun' ? (
-                    <p className="text-sm">Mailgun — {mailgun.domain}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Non configuré</p>
-                  )}
-                </div>
+                ))}
               </div>
             )}
+          </div>
+        </div>
 
-            {/* Navigation */}
-            <div className="flex justify-between pt-4">
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                disabled={step === 0}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Retour
-              </Button>
+        {/* Bottom bar */}
+        <div style={{
+          borderTop: '1px solid var(--border)',
+          padding: '16px 56px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0,
+        }}>
+          <button
+            type="button" onClick={handleBack} disabled={step === 0}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 'var(--r-lg)',
+              background: 'transparent', border: 'none',
+              fontSize: 13, fontWeight: 500, cursor: step === 0 ? 'not-allowed' : 'pointer',
+              color: step === 0 ? 'var(--fg-disabled)' : 'var(--fg-muted)',
+              fontFamily: 'inherit', transition: 'color 0.15s',
+            }}
+          >
+            <ArrowLeft size={14} />
+            Retour
+          </button>
 
-              {step < STEPS.length - 1 ? (
-                <Button onClick={handleNext}>
-                  Suivant
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+          {step < STEPS.length - 1 ? (
+            <button
+              type="button" onClick={handleNext}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 20px', borderRadius: 'var(--r-lg)',
+                background: 'var(--accent)', color: 'var(--accent-fg)',
+                border: 'none', fontSize: 13, fontWeight: 500,
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent)'; }}
+            >
+              Enregistrer et continuer
+              <ArrowRight size={14} />
+            </button>
+          ) : (
+            <button
+              type="button" onClick={handleSubmit} disabled={loading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 20px', borderRadius: 'var(--r-lg)',
+                background: 'var(--accent)', color: 'var(--accent-fg)',
+                border: 'none', fontSize: 13, fontWeight: 500,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+                fontFamily: 'inherit', transition: 'background 0.15s, opacity 0.15s',
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = 'var(--accent-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent)'; }}
+            >
+              {loading ? (
+                <><Loader2 size={14} className="animate-spin" /> Configuration...</>
               ) : (
-                <Button onClick={handleSubmit} disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Configuration...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Lancer HTGether
-                    </>
-                  )}
-                </Button>
+                <><CheckCircle2 size={14} /> Lancer HTGether</>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

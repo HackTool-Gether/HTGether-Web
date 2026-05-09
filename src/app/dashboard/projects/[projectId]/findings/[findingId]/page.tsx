@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Topbar } from '@/components/shell/topbar';
 import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -14,7 +13,8 @@ import {
   type FindingStatus,
   type ProjectDetail,
 } from '@/lib/api';
-import { ArrowLeft, Loader2, Save, MoreHorizontal, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 const SEVERITIES: Severity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
@@ -165,70 +165,60 @@ export default function FindingEditPage() {
 
   if (loading) {
     return (
-      <>
-        <Topbar crumbs={[{ label: 'Findings' }]} />
-        <div style={{ padding: 40, color: 'var(--fg-muted)' }}>Chargement…</div>
-      </>
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
   }
   if (!finding) {
     return (
-      <>
-        <Topbar crumbs={[{ label: 'Findings' }, { label: 'Introuvable' }]} />
-        <div style={{ padding: 40, color: 'var(--sev-critical-fg)' }}>{error || 'Finding introuvable'}</div>
-      </>
+      <div className="px-4 sm:px-8 pt-4 sm:pt-6">
+        <p className="text-sm text-destructive">{error || 'Finding introuvable'}</p>
+      </div>
     );
   }
 
   const sevLow = severity.toLowerCase();
 
   return (
-    <>
-      <Topbar
-        crumbs={[
-          { label: 'Projets' },
-          { label: project?.name || '…', mono: true },
-          { label: 'Findings' },
-          { label: finding.slug || finding.id.slice(0, 8), mono: true },
-        ]}
-        actions={
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span
-              className="mono"
-              style={{
-                fontSize: 11,
-                color:
-                  saveState === 'saving'
-                    ? 'var(--fg-muted)'
-                    : saveState === 'saved'
-                    ? 'var(--st-compliant-fg)'
-                    : saveState === 'error'
-                    ? 'var(--sev-critical-fg)'
-                    : 'var(--fg-subtle)',
-              }}
-            >
-              {saveState === 'saving' && 'enregistrement…'}
-              {saveState === 'saved' && '✓ enregistré'}
-              {saveState === 'error' && 'erreur'}
-            </span>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => router.push(`/dashboard/projects/${projectId}/findings`)}
-            >
-              <ArrowLeft size={12} /> Liste
-            </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={handleDelete} title="Supprimer">
-              <Trash2 size={12} />
-            </button>
-          </div>
-        }
-      />
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Header */}
+      <div className="px-4 sm:px-8 pt-4 sm:pt-6 pb-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground" onClick={() => router.push(`/dashboard/projects/${projectId}/findings`)}>
+            <ArrowLeft className="h-3 w-3 mr-1" />
+            Findings
+          </Button>
+          <span className="font-mono text-xs text-muted-foreground">{finding.slug || finding.id.slice(0, 8)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className="font-mono text-[11px]"
+            style={{
+              color:
+                saveState === 'saving'
+                  ? 'var(--fg-muted)'
+                  : saveState === 'saved'
+                  ? 'var(--st-compliant-fg)'
+                  : saveState === 'error'
+                  ? 'var(--sev-critical-fg)'
+                  : 'var(--fg-subtle)',
+            }}
+          >
+            {saveState === 'saving' && 'enregistrement…'}
+            {saveState === 'saved' && '✓ enregistré'}
+            {saveState === 'error' && 'erreur'}
+          </span>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={handleDelete} title="Supprimer">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Main */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '20px 28px 14px', borderBottom: '1px solid var(--border-subtle)' }}>
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="px-4 sm:px-8 pb-3">
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -274,8 +264,7 @@ export default function FindingEditPage() {
             style={{
               display: 'flex',
               gap: 4,
-              padding: '8px 28px 0',
-              borderBottom: '1px solid var(--border-subtle)',
+              padding: '8px 16px 0',
             }}
           >
             {TABS.map((t) => {
@@ -306,7 +295,7 @@ export default function FindingEditPage() {
           </div>
 
           {/* Editor */}
-          <div style={{ flex: 1, padding: '14px 28px', overflow: 'auto' }}>
+          <div style={{ flex: 1, padding: '14px 16px', overflow: 'auto' }}>
             {tab === 'description' && (
               <FindingEditor
                 value={description}
@@ -354,7 +343,6 @@ export default function FindingEditPage() {
           style={{
             width: 320,
             flexShrink: 0,
-            borderLeft: '1px solid var(--border-subtle)',
             background: 'var(--bg-elevated)',
             overflow: 'auto',
             padding: '18px 20px',
@@ -373,9 +361,8 @@ export default function FindingEditPage() {
                   onClick={() => handleSeverityChange(s)}
                   style={{
                     padding: '6px 0',
-                    background: active ? `var(--sev-${sl}-bg)` : 'var(--bg-input)',
-                    border: '1px solid',
-                    borderColor: active ? `var(--sev-${sl}-br)` : 'var(--border-subtle)',
+                    background: active ? `var(--sev-${sl}-bg)` : 'var(--bg-subtle)',
+                    border: 'none',
                     borderRadius: 'var(--r-sm)',
                     color: active ? `var(--sev-${sl}-fg)` : 'var(--fg-muted)',
                     fontSize: 10.5,
@@ -445,7 +432,7 @@ export default function FindingEditPage() {
           </div>
         </aside>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -459,9 +446,8 @@ function FindingEditor({ value, onChange, placeholder }: FindingEditorProps) {
   return (
     <div
       style={{
-        border: '1px solid var(--border-subtle)',
         borderRadius: 'var(--r-md)',
-        background: 'var(--bg-input)',
+        background: 'var(--bg-elevated)',
         padding: '14px 18px',
         minHeight: 280,
       }}

@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Topbar } from '@/components/shell/topbar';
 import { Avatar } from '@/components/shell/avatar';
 import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   projectsApi,
   findingsApi,
@@ -15,7 +16,7 @@ import {
   type FindingStatus,
   type ProjectDetail,
 } from '@/lib/api';
-import { Plus, Filter, Loader2, X } from 'lucide-react';
+import { Plus, ArrowLeft, Loader2, X } from 'lucide-react';
 
 const SEVERITY_ORDER: Severity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
 
@@ -75,13 +76,13 @@ export default function FindingsListPage() {
       ]);
       setProject(proj);
       setFindings(finds);
-      if (finds.length > 0 && !selected) setSelected(finds[0].id);
+      setSelected((prev) => prev ?? (finds.length > 0 ? finds[0].id : null));
     } catch {
       setError('Impossible de charger les findings');
     } finally {
       setLoading(false);
     }
-  }, [token, projectId, selected]);
+  }, [token, projectId]);
 
   useEffect(() => {
     load();
@@ -123,225 +124,136 @@ export default function FindingsListPage() {
   const filtered = sev === 'all' ? findings : findings.filter((f) => f.severity === sev);
   const cur = findings.find((f) => f.id === selected) || null;
 
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
-    <>
-      <Topbar
-        crumbs={[
-          { label: 'Projets' },
-          { label: project?.name || '…', mono: true },
-          { label: 'Findings' },
-        ]}
-        actions={
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-            <Plus size={12} /> Nouveau finding
-          </button>
-        }
-      />
-
-      {error && (
-        <div
-          style={{
-            margin: '12px 24px 0',
-            padding: '10px 12px',
-            fontSize: 13,
-            color: 'var(--sev-critical-fg)',
-            background: 'var(--sev-critical-bg)',
-            border: '1px solid var(--sev-critical-br)',
-            borderRadius: 'var(--r-md)',
-          }}
-        >
-          {error}
+    <div className="flex-1 overflow-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 px-4 sm:px-8 pt-4 sm:pt-6 pb-4">
+        <div>
+          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground mb-1" onClick={() => router.push(`/dashboard/projects/${projectId}`)}>
+            <ArrowLeft className="h-3 w-3 mr-1" />
+            {project?.name || '…'}
+          </Button>
+          <h1 className="text-2xl font-bold">
+            Findings
+            <span className="ml-2 text-base font-normal text-muted-foreground font-mono">{findings.length}</span>
+          </h1>
         </div>
-      )}
+        <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Plus className="mr-1 h-3 w-3" /> Nouveau finding
+        </Button>
+      </div>
 
-      {showCreate && (
-        <div style={{ padding: '12px 24px 0' }}>
-          <form
-            onSubmit={handleCreate}
-            className="card-htg sig-card"
-            style={{
-              padding: 12,
-              display: 'grid',
-              gridTemplateColumns: '1fr 160px auto auto',
-              gap: 8,
-              alignItems: 'center',
-            }}
-          >
-            <input
-              className="input"
-              placeholder="Titre du finding (ex: SQLi sur /api/v2/login)"
-              autoFocus
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
-            />
-            <select
-              className="input"
-              value={form.severity}
-              onChange={(e) => setForm({ ...form, severity: e.target.value as Severity })}
-            >
-              {SEVERITY_ORDER.map((s) => (
-                <option key={s} value={s}>
-                  {s.toLowerCase()}
-                </option>
-              ))}
-            </select>
-            <button type="submit" className="btn btn-primary btn-sm" disabled={creating}>
-              {creating && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />}
-              Créer
-            </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowCreate(false)}>
-              <X size={12} />
-            </button>
-          </form>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        {/* Main pane */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '18px 24px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-end',
-                justifyContent: 'space-between',
-                marginBottom: 14,
-              }}
-            >
-              <div>
-                <div
-                  className="mono"
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--fg-subtle)',
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                    marginBottom: 4,
-                  }}
+      <div className="px-4 sm:px-8">
+        {/* Severity filters */}
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <div className="flex gap-1 flex-wrap">
+            {(
+              [
+                { k: 'all' as const, label: 'Toutes', c: '' },
+                ...SEVERITY_ORDER.map((s) => ({
+                  k: s,
+                  label: s.charAt(0) + s.slice(1).toLowerCase(),
+                  c: `var(--sev-${s.toLowerCase()}-fg)`,
+                })),
+              ]
+            ).map((f) => {
+              const active = sev === f.k;
+              const n = f.k === 'all' ? findings.length : findings.filter((fd) => fd.severity === f.k).length;
+              return (
+                <Button
+                  key={f.k}
+                  variant={active ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSev(f.k)}
+                  className="gap-1.5"
                 >
-                  {project?.name || '…'} · findings
-                </div>
-                <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.015em', margin: 0 }}>
-                  Findings{' '}
-                  <span
-                    className="mono"
-                    style={{
-                      color: 'var(--fg-subtle)',
-                      fontSize: 14,
-                      fontWeight: 400,
-                      marginLeft: 6,
-                    }}
-                  >
-                    {findings.length}
-                  </span>
-                </h1>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className="btn btn-sm">
-                  <Filter size={12} /> Filtres
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {(
-                [
-                  { k: 'all' as const, label: 'Toutes', n: findings.length, c: 'var(--fg-muted)' },
-                  ...SEVERITY_ORDER.map((s) => ({
-                    k: s,
-                    label: s.charAt(0) + s.slice(1).toLowerCase(),
-                    n: findings.filter((f) => f.severity === s).length,
-                    c: `var(--sev-${s.toLowerCase()}-fg)`,
-                  })),
-                ]
-              ).map((f) => {
-                const active = sev === f.k;
-                return (
-                  <button
-                    key={f.k}
-                    type="button"
-                    onClick={() => setSev(f.k)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '4px 10px',
-                      background: active ? 'var(--bg-subtle)' : 'transparent',
-                      border: '1px solid',
-                      borderColor: active ? 'var(--border)' : 'transparent',
-                      borderRadius: 'var(--r-sm)',
-                      color: active ? 'var(--fg)' : 'var(--fg-muted)',
-                      fontSize: 12.5,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    {f.k !== 'all' && (
-                      <span
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 'var(--r-full)',
-                          background: f.c,
-                        }}
-                      />
-                    )}
-                    {f.label}
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>
-                      {f.n}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                  {f.k !== 'all' && (
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ background: f.c }}
+                    />
+                  )}
+                  {f.label}
+                  <span className="text-xs text-muted-foreground font-mono">{n}</span>
+                </Button>
+              );
+            })}
           </div>
+        </div>
 
-          {/* Table */}
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <div
-              className="cap"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '120px 90px 1fr 70px 110px 130px 90px',
-                gap: 12,
-                padding: '8px 24px',
-                borderBottom: '1px solid var(--border-subtle)',
-                background: 'var(--bg)',
-                position: 'sticky',
-                top: 0,
-                fontSize: 10.5,
-              }}
-            >
-              <div>ID</div>
-              <div>Sévérité</div>
-              <div>Titre</div>
-              <div style={{ textAlign: 'right' }}>CVSS</div>
-              <div>Statut</div>
-              <div>Owner</div>
-              <div style={{ textAlign: 'right' }}>Maj</div>
-            </div>
+        {error && (
+          <div className="mb-4 p-3 text-sm rounded-lg bg-destructive/10 text-destructive">
+            {error}
+          </div>
+        )}
 
-            {loading ? (
-              <div style={{ padding: 40, color: 'var(--fg-muted)' }}>Chargement…</div>
-            ) : filtered.length === 0 ? (
-              <div
-                style={{
-                  margin: 24,
-                  padding: 40,
-                  textAlign: 'center',
-                  border: '1px dashed var(--border)',
-                  borderRadius: 'var(--r-lg)',
-                  color: 'var(--fg-muted)',
-                  fontSize: 13,
-                }}
+        {/* Create form */}
+        {showCreate && (
+          <div className="rounded-xl bg-card p-3 mb-4">
+            <form onSubmit={handleCreate} className="flex items-center gap-2">
+              <Input
+                placeholder="Titre du finding (ex: SQLi sur /api/v2/login)"
+                autoFocus
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+                className="flex-1 h-8 text-sm"
+              />
+              <select
+                className="input h-8 text-sm w-[140px]"
+                value={form.severity}
+                onChange={(e) => setForm({ ...form, severity: e.target.value as Severity })}
               >
-                {findings.length === 0
-                  ? 'Aucun finding pour ce projet. Créez-en un pour commencer.'
-                  : 'Aucun finding ne correspond au filtre.'}
+                {SEVERITY_ORDER.map((s) => (
+                  <option key={s} value={s}>{s.toLowerCase()}</option>
+                ))}
+              </select>
+              <Button type="submit" size="sm" disabled={creating}>
+                {creating && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                Créer
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
+                <X className="h-3 w-3" />
+              </Button>
+            </form>
+          </div>
+        )}
+
+        {/* Content */}
+        {filtered.length === 0 ? (
+          <div className="rounded-xl bg-card p-10 text-center text-sm text-muted-foreground">
+            {findings.length === 0
+              ? 'Aucun finding pour ce projet. Créez-en un pour commencer.'
+              : 'Aucun finding ne correspond au filtre.'}
+          </div>
+        ) : (
+          <div className="flex gap-0 min-h-0">
+            {/* Table */}
+            <div className="flex-1 min-w-0 rounded-xl bg-card overflow-hidden">
+              {/* Column headers */}
+              <div
+                className="cap grid gap-3 px-4 py-2 text-[10.5px]"
+                style={{ gridTemplateColumns: '100px 80px 1fr 60px 100px 110px 80px' }}
+              >
+                <div>ID</div>
+                <div>Sévérité</div>
+                <div>Titre</div>
+                <div className="text-right">CVSS</div>
+                <div>Statut</div>
+                <div>Owner</div>
+                <div className="text-right">Maj</div>
               </div>
-            ) : (
-              filtered.map((f) => {
+
+              {/* Rows */}
+              {filtered.map((f) => {
                 const active = f.id === selected;
                 const sevLow = f.severity.toLowerCase();
                 const owner = f.author
@@ -352,56 +264,32 @@ export default function FindingsListPage() {
                     key={f.id}
                     onClick={() => setSelected(f.id)}
                     onDoubleClick={() => router.push(`/dashboard/projects/${projectId}/findings/${f.id}`)}
+                    className="grid gap-3 px-4 py-2.5 items-center cursor-pointer transition-colors relative text-sm"
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '120px 90px 1fr 70px 110px 130px 90px',
-                      gap: 12,
-                      padding: '10px 24px',
-                      alignItems: 'center',
-                      borderBottom: '1px solid var(--border-subtle)',
-                      cursor: 'pointer',
-                      background: active ? 'var(--bg-subtle)' : 'transparent',
-                      position: 'relative',
-                      fontSize: 13,
+                      gridTemplateColumns: '100px 80px 1fr 60px 100px 110px 80px',
+                      background: active ? 'var(--bg-subtle)' : undefined,
                     }}
                     onMouseEnter={(e) => {
-                      if (!active) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-subtle)';
+                      if (!active) e.currentTarget.style.background = 'var(--bg-subtle)';
                     }}
                     onMouseLeave={(e) => {
-                      if (!active) (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+                      if (!active) e.currentTarget.style.background = '';
                     }}
                   >
                     {active && (
                       <span
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: 2,
-                          background: `var(--sev-${sevLow}-fg)`,
-                        }}
+                        className="absolute left-0 top-0 bottom-0 w-0.5 rounded-r"
+                        style={{ background: `var(--sev-${sevLow}-fg)` }}
                       />
                     )}
-                    <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
+                    <span className="font-mono text-xs text-muted-foreground truncate">
                       {f.slug || f.id.slice(0, 8)}
                     </span>
                     <span className={`badge badge-${sevLow}`}>{sevLow}</span>
+                    <div className="truncate">{f.title}</div>
                     <div
+                      className="font-mono text-xs text-right"
                       style={{
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {f.title}
-                    </div>
-                    <div
-                      className="mono"
-                      style={{
-                        fontSize: 12.5,
-                        textAlign: 'right',
                         color:
                           (f.cvssScore || 0) >= 7
                             ? 'var(--sev-critical-fg)'
@@ -412,177 +300,99 @@ export default function FindingsListPage() {
                     >
                       {f.cvssScore !== undefined && f.cvssScore !== null ? f.cvssScore.toFixed(1) : '—'}
                     </div>
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 12,
-                        color: 'var(--fg-muted)',
-                      }}
-                    >
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <span
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 'var(--r-full)',
-                          background: STATUS_DOT[f.status],
-                        }}
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: STATUS_DOT[f.status] }}
                       />
                       {STATUS_LABEL[f.status]}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className="flex items-center gap-1.5">
                       {owner && <Avatar user={owner} />}
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: 'var(--fg-muted)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
+                      <span className="text-xs text-muted-foreground truncate">
                         {owner ? owner.name.split(' ')[0] : ''}
                       </span>
                     </div>
-                    <div
-                      className="mono"
-                      style={{ fontSize: 11, color: 'var(--fg-subtle)', textAlign: 'right' }}
-                    >
+                    <div className="font-mono text-[11px] text-muted-foreground text-right">
                       {relativeTime(f.updatedAt)}
                     </div>
                   </div>
                 );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Side panel */}
-        <aside
-          style={{
-            width: 360,
-            flexShrink: 0,
-            borderLeft: '1px solid var(--border-subtle)',
-            background: 'var(--bg-elevated)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'auto',
-          }}
-        >
-          {!cur ? (
-            <div style={{ padding: 24, color: 'var(--fg-muted)', fontSize: 13 }}>
-              Sélectionnez un finding pour voir le détail.
+              })}
             </div>
-          ) : (
-            <>
-              <div
-                style={{
-                  padding: '18px 20px 14px',
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}
-              >
-                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-subtle)', marginBottom: 6 }}>
-                  {cur.slug || cur.id.slice(0, 8)}
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 10 }}>
-                  {cur.title}
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <span className={`badge badge-${cur.severity.toLowerCase()}`}>
-                    {cur.severity.toLowerCase()}
-                  </span>
-                  {cur.cvssScore !== undefined && cur.cvssScore !== null && (
-                    <span className="badge badge-info">CVSS {cur.cvssScore.toFixed(1)}</span>
-                  )}
-                  <span className="badge badge-info" style={{ textTransform: 'none' }}>
-                    {STATUS_LABEL[cur.status]}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}
-                  onClick={() => router.push(`/dashboard/projects/${projectId}/findings/${cur.id}`)}
-                >
-                  Ouvrir l&apos;éditeur
-                </button>
-              </div>
 
-              {cur.cvssVector && (
-                <div
-                  style={{
-                    padding: '16px 20px',
-                    borderBottom: '1px solid var(--border-subtle)',
-                  }}
-                >
-                  <div className="cap" style={{ fontSize: 10.5, marginBottom: 10 }}>
-                    Vecteur CVSS
-                  </div>
-                  <div
-                    className="mono"
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--fg-muted)',
-                      userSelect: 'all',
-                      padding: 8,
-                      background: 'var(--bg-input)',
-                      borderRadius: 'var(--r-sm)',
-                      border: '1px solid var(--border-subtle)',
-                      wordBreak: 'break-all',
-                    }}
-                  >
-                    {cur.cvssVector}
-                  </div>
+            {/* Side panel */}
+            <aside className="w-[320px] shrink-0 rounded-xl bg-card overflow-auto hidden lg:block ml-4">
+              {!cur ? (
+                <div className="p-6 text-sm text-muted-foreground">
+                  Sélectionnez un finding pour voir le détail.
                 </div>
-              )}
-
-              <div style={{ padding: '16px 20px' }}>
-                <div className="cap" style={{ fontSize: 10.5, marginBottom: 10 }}>
-                  Métadonnées
-                </div>
-                {[
-                  ['Auteur', cur.author ? `${cur.author.firstName} ${cur.author.lastName}` : '—', false],
-                  ['Créé', new Date(cur.createdAt).toLocaleDateString('fr-FR'), true],
-                  ['Maj', relativeTime(cur.updatedAt), true],
-                ].map(([k, v, mono]) => (
-                  <div
-                    key={k as string}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '6px 0',
-                      fontSize: 12.5,
-                    }}
-                  >
-                    <span style={{ color: 'var(--fg-subtle)' }}>{k as string}</span>
-                    <span className={mono ? 'mono' : ''}>{v as string}</span>
-                  </div>
-                ))}
-                {cur.tags && (
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-                    {cur.tags.split(',').map((t) => t.trim()).filter(Boolean).map((t) => (
-                      <span
-                        key={t}
-                        style={{
-                          fontSize: 11,
-                          padding: '2px 8px',
-                          background: 'var(--bg-input)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: 'var(--r-sm)',
-                          color: 'var(--fg-muted)',
-                        }}
-                      >
-                        #{t}
+              ) : (
+                <>
+                  <div className="p-5">
+                    <div className="font-mono text-[11px] text-muted-foreground mb-1.5">
+                      {cur.slug || cur.id.slice(0, 8)}
+                    </div>
+                    <div className="text-[15px] font-semibold leading-snug mb-3">
+                      {cur.title}
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <span className={`badge badge-${cur.severity.toLowerCase()}`}>
+                        {cur.severity.toLowerCase()}
                       </span>
-                    ))}
+                      {cur.cvssScore !== undefined && cur.cvssScore !== null && (
+                        <span className="badge badge-info">CVSS {cur.cvssScore.toFixed(1)}</span>
+                      )}
+                      <span className="badge badge-info" style={{ textTransform: 'none' }}>
+                        {STATUS_LABEL[cur.status]}
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="w-full mt-3"
+                      onClick={() => router.push(`/dashboard/projects/${projectId}/findings/${cur.id}`)}
+                    >
+                      Ouvrir l&apos;éditeur
+                    </Button>
                   </div>
-                )}
-              </div>
-            </>
-          )}
-        </aside>
+
+                  {cur.cvssVector && (
+                    <div className="px-5 pb-4">
+                      <div className="cap text-[10.5px] mb-2">Vecteur CVSS</div>
+                      <div className="font-mono text-[11px] text-muted-foreground p-2 bg-secondary rounded-md break-all select-all">
+                        {cur.cvssVector}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="px-5 pb-5">
+                    <div className="cap text-[10.5px] mb-2">Métadonnées</div>
+                    {[
+                      ['Auteur', cur.author ? `${cur.author.firstName} ${cur.author.lastName}` : '—', false],
+                      ['Créé', new Date(cur.createdAt).toLocaleDateString('fr-FR'), true],
+                      ['Maj', relativeTime(cur.updatedAt), true],
+                    ].map(([k, v, mono]) => (
+                      <div key={k as string} className="flex justify-between items-center py-1 text-xs">
+                        <span className="text-muted-foreground">{k as string}</span>
+                        <span className={mono ? 'font-mono' : ''}>{v as string}</span>
+                      </div>
+                    ))}
+                    {cur.tags && (
+                      <div className="flex gap-1.5 flex-wrap mt-2.5">
+                        {cur.tags.split(',').map((t) => t.trim()).filter(Boolean).map((t) => (
+                          <span key={t} className="text-[11px] px-2 py-0.5 bg-secondary rounded-sm text-muted-foreground">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </aside>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
