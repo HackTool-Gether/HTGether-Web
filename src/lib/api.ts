@@ -117,6 +117,13 @@ export const authApi = {
       body: JSON.stringify({ currentPassword, newPassword }),
       token,
     }),
+
+  updateOnboarding: (data: { step?: number; completed?: boolean }, token: string) =>
+    apiRequest<{ id: string; onboardingCompleted: boolean; onboardingStep: number }>('/auth/onboarding', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      token,
+    }),
 };
 
 // Setup API
@@ -377,6 +384,8 @@ export interface User {
   role: 'SUPER_ADMIN' | 'USER';
   isActive?: boolean;
   mustChangePassword?: boolean;
+  onboardingCompleted?: boolean;
+  onboardingStep?: number;
   createdAt?: string;
 }
 

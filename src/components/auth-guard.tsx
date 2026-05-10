@@ -19,7 +19,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         try {
           const { isSetup, onboardingComplete } = await setupApi.getStatus();
           if (!isSetup || !onboardingComplete) {
-            router.replace('/setup');
+            router.replace('/onboarding');
           } else {
             router.replace('/login');
           }
