@@ -192,7 +192,9 @@ export default function SetupPage() {
   const [mailgun, setMailgun] = useState({ apiKey: '', domain: '', fromEmail: '', fromName: '' });
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const callbackUrl = typeof window !== 'undefined' ? `${window.location.origin}/login` : '';
+  const callbackUrl = company.domain
+    ? `https://${company.domain}/login`
+    : typeof window !== 'undefined' ? `${window.location.origin}/login` : '';
 
   const copyCallbackUrl = async (providerId: string) => {
     await navigator.clipboard.writeText(callbackUrl);

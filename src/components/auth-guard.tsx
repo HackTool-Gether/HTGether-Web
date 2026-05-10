@@ -35,6 +35,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Onboarding not finished
+      if (!user.onboardingCompleted) {
+        router.replace('/onboarding');
+        return;
+      }
+
       setChecking(false);
     };
 

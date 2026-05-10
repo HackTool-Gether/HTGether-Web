@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { setupApi, authApi, ApiError } from '@/lib/api';
@@ -172,12 +172,41 @@ function FieldGroup({ label, children, hint }: { label: string; children: React.
   );
 }
 
+const STORAGE_KEY = 'htgether_onboarding';
+const STEP_STORAGE_KEY = 'htgether_onboarding_step';
+
+function saveFormData(data: Record<string, any>) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadFormData(): Record<string, any> | null {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function saveStep(s: number) {
+  localStorage.setItem(STEP_STORAGE_KEY, String(s));
+}
+
+function loadStep(): number | null {
+  const raw = localStorage.getItem(STEP_STORAGE_KEY);
+  if (raw === null) return null;
+  const parsed = parseInt(raw, 10);
+  return isNaN(parsed) ? null : parsed;
+}
+
+function clearStepStorage() {
+  localStorage.removeItem(STEP_STORAGE_KEY);
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
-  const { loginWithTokens } = useAuth();
+  const { user, token, loginWithTokens, isLoading: authLoading } = useAuth();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState('');
+  const didInit = useRef(false);
 
   const [admin, setAdmin] = useState({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '' });
   const [company, setCompany] = useState({ name: '', domain: '' });
@@ -194,7 +223,59 @@ export default function OnboardingPage() {
   const [mailgun, setMailgun] = useState({ apiKey: '', domain: '', fromEmail: '', fromName: '' });
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const callbackUrl = typeof window !== 'undefined' ? `${window.location.origin}/login` : '';
+  useEffect(() => {
+    if (authLoading || didInit.current) return;
+
+    const init = async () => {
+      const saved = loadFormData();
+      if (saved) {
+        if (saved.admin) setAdmin((prev) => ({ ...prev, ...saved.admin }));
+        if (saved.company) setCompany(saved.company);
+        if (saved.authProviders) setAuthProviders(saved.authProviders);
+        if (saved.ai) setAi(saved.ai);
+        if (saved.emailProvider) setEmailProvider(saved.emailProvider);
+        if (saved.smtp) setSmtp(saved.smtp);
+        if (saved.mailgun) setMailgun(saved.mailgun);
+      }
+
+      if (user && token) {
+        if (user.onboardingCompleted) {
+          router.replace('/dashboard');
+          return;
+        }
+        try {
+          const profile = await authApi.getProfile(token);
+          const serverStep = profile.onboardingStep ?? 0;
+          setStep(serverStep);
+          saveStep(serverStep);
+        } catch {
+          const savedStep = loadStep();
+          setStep(savedStep ?? 0);
+        }
+      } else {
+        const savedStep = loadStep();
+        if (savedStep !== null && savedStep > 0) {
+          setStep(savedStep);
+        }
+      }
+
+      didInit.current = true;
+      setInitializing(false);
+    };
+
+    init();
+  }, [authLoading, user, token, router]);
+
+  const persistFormData = () => {
+    saveFormData({
+      admin: { email: admin.email, firstName: admin.firstName, lastName: admin.lastName },
+      company, authProviders, ai, emailProvider, smtp, mailgun,
+    });
+  };
+
+  const callbackUrl = company.domain
+    ? `https://${company.domain}/login`
+    : typeof window !== 'undefined' ? `${window.location.origin}/login` : '';
 
   const copyCallbackUrl = async (providerId: string) => {
     await navigator.clipboard.writeText(callbackUrl);
@@ -229,14 +310,60 @@ export default function OnboardingPage() {
     if (target < step) { setError(''); setStep(target); }
   };
 
-  const handleNext = () => { if (validateStep()) setStep((s) => Math.min(s + 1, STEPS.length - 1)); };
+  const handleNext = async () => {
+    if (!validateStep()) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const nextStep = step + 1;
+      let currentToken = token;
+
+      if (currentStep.id === 'admin') {
+        await setupApi.init({
+          email: admin.email,
+          password: admin.password,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+        });
+        const loginResponse = await authApi.login(
+          admin.email,
+          admin.password,
+        );
+        currentToken = loginResponse.accessToken;
+        loginWithTokens(loginResponse);
+      }
+
+      persistFormData();
+
+      if (currentToken) {
+        await authApi.updateOnboarding(
+          { step: nextStep },
+          currentToken,
+        );
+      }
+
+      setStep(nextStep);
+      saveStep(nextStep);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Une erreur est survenue',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleBack = () => { setError(''); setStep((s) => Math.max(s - 1, 0)); };
 
   const handleSubmit = async () => {
+    if (!token) return;
     setLoading(true);
     setError('');
     const data: OnboardingData = {
-      admin: { email: admin.email, password: admin.password, firstName: admin.firstName, lastName: admin.lastName },
+      admin: { email: admin.email || user!.email, password: admin.password || 'unchanged', firstName: admin.firstName || user!.firstName, lastName: admin.lastName || user!.lastName },
       company: { name: company.name, domain: company.domain || undefined },
       auth: { providers: Object.entries(authProviders).map(([type, { enabled, config }]) => ({ type, enabled, config })) },
       ai: { enabled: ai.enabled, provider: ai.provider || undefined, apiKey: ai.apiKey || undefined, model: ai.model || undefined },
@@ -244,11 +371,11 @@ export default function OnboardingPage() {
     };
     try {
       await setupApi.onboarding(data);
-      // Auto-login with the admin credentials just created
-      const loginResponse = await authApi.login(admin.email, admin.password);
-      // Mark user onboarding as completed
-      await authApi.updateOnboarding({ completed: true, step: STEPS.length - 1 }, loginResponse.accessToken);
-      loginWithTokens({ ...loginResponse, user: { ...loginResponse.user, onboardingCompleted: true } });
+      await authApi.updateOnboarding({ completed: true, step: STEPS.length - 1 }, token);
+      const profile = await authApi.getProfile(token);
+      loginWithTokens({ user: profile, accessToken: token, refreshToken: localStorage.getItem('htgether_refresh_token') || '' });
+      localStorage.removeItem(STORAGE_KEY);
+      clearStepStorage();
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Une erreur est survenue');
@@ -265,6 +392,14 @@ export default function OnboardingPage() {
   };
 
   const inputClass = "h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm";
+
+  if (authLoading || initializing) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -700,17 +835,20 @@ export default function OnboardingPage() {
 
           {step < STEPS.length - 1 ? (
             <button
-              type="button" onClick={handleNext}
+              type="button" onClick={handleNext} disabled={loading}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '10px 20px', borderRadius: 'var(--r-lg)',
                 background: 'var(--accent)', color: 'var(--accent-fg)',
                 border: 'none', fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+                fontFamily: 'inherit', transition: 'background 0.15s, opacity 0.15s',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-hover)'; }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = 'var(--accent-hover)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent)'; }}
             >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : null}
               Enregistrer et continuer
               <ArrowRight size={14} />
             </button>
