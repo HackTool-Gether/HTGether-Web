@@ -23,7 +23,8 @@ Le serveur ecoute sur `http://localhost:3002` par defaut.
 
 ### Pre-commit hooks
 
-Le projet utilise [pre-commit](https://pre-commit.com/) pour executer des verifications automatiques avant chaque commit.
+Le projet utilise [pre-commit](https://pre-commit.com/) pour executer des
+verifications automatiques avant chaque commit.
 
 Installation :
 
@@ -35,7 +36,7 @@ pre-commit install
 Hooks configures (`.pre-commit-config.yaml`) :
 
 | Hook | Role |
-|---|---|
+| --- | --- |
 | `trailing-whitespace` | Supprime les espaces en fin de ligne |
 | `end-of-file-fixer` | Assure un newline en fin de fichier |
 | `check-yaml` | Valide la syntaxe YAML |
@@ -56,7 +57,9 @@ Hooks configures (`.pre-commit-config.yaml`) :
 Deux workflows dans `.github/workflows/` :
 
 - **`pre-commit.yml`** — Execute les hooks pre-commit sur chaque push et PR.
-- **`security-scan.yml`** — Analyse SCA avec [Grype](https://github.com/anchore/grype) sur push `main` et PR. Echoue si une vulnerabilite High+ est detectee.
+- **`security-scan.yml`** — Analyse SCA avec
+  [Grype](https://github.com/anchore/grype) sur push `main` et PR.
+  Echoue si une vulnerabilite High+ est detectee.
 
 ### SCA (Software Composition Analysis)
 
@@ -71,7 +74,7 @@ grype dir:.
 Derniere analyse (2026-05-08) :
 
 | Dependance | Version | Fix | Severite | GHSA |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | next | 16.1.6 | 16.2.3 | High | GHSA-q4gf-8mx6-v5v3 |
 | path-to-regexp | 8.3.0 | 8.4.0 | High | GHSA-j3q9-mxjg-w52f |
 | picomatch | 2.3.1 | 2.3.2 | High | GHSA-c2c7-rcm5-vvqj |
