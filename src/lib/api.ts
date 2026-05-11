@@ -225,6 +225,30 @@ export const projectsApi = {
       method: 'DELETE',
       token,
     }),
+
+  updateMemberRole: (projectId: string, memberId: string, role: string, token: string) =>
+    apiRequest<ProjectMember>(`/projects/${projectId}/members/${memberId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+      token,
+    }),
+
+  getPermissions: (projectId: string, token: string) =>
+    apiRequest<PermissionsResponse>(`/projects/${projectId}/permissions`, { token }),
+
+  updatePermissions: (projectId: string, overrides: Record<string, Record<string, boolean>>, token: string) =>
+    apiRequest<{ id: string; rolePermissions: Record<string, Record<string, boolean>> }>(`/projects/${projectId}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify({ overrides }),
+      token,
+    }),
+
+  updateKanbanConfig: (projectId: string, labels: Record<string, string>, token: string) =>
+    apiRequest<{ id: string; kanbanConfig: KanbanConfig }>(`/projects/${projectId}/kanban-config`, {
+      method: 'PUT',
+      body: JSON.stringify({ labels }),
+      token,
+    }),
 };
 
 // Scopes API
@@ -323,6 +347,70 @@ export const findingsApi = {
 
   remove: (id: string, token: string) =>
     apiRequest<void>(`/findings/${id}`, { method: 'DELETE', token }),
+};
+
+// Tasks API
+export type TaskStatus = 'BACKLOG' | 'TODO' | 'IN_PROGRESS' | 'DONE';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  position: number;
+  dueDate?: string;
+  projectId: string;
+  assigneeId?: string;
+  creatorId: string;
+  creator?: { id: string; firstName: string; lastName: string };
+  assignee?: {
+    id: string;
+    user: { id: string; firstName: string; lastName: string };
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaskData {
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  assigneeId?: string;
+  dueDate?: string;
+}
+
+export const tasksApi = {
+  getAllByProject: (projectId: string, token: string) =>
+    apiRequest<Task[]>(`/projects/${projectId}/tasks`, { token }),
+
+  create: (projectId: string, data: CreateTaskData, token: string) =>
+    apiRequest<Task>(`/projects/${projectId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getOne: (id: string, token: string) =>
+    apiRequest<Task>(`/tasks/${id}`, { token }),
+
+  update: (id: string, data: Partial<CreateTaskData & { status: TaskStatus }>, token: string) =>
+    apiRequest<Task>(`/tasks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  move: (id: string, data: { status: TaskStatus; position: number }, token: string) =>
+    apiRequest<Task>(`/tasks/${id}/move`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (id: string, token: string) =>
+    apiRequest<void>(`/tasks/${id}`, { method: 'DELETE', token }),
 };
 
 // Reports API
@@ -453,6 +541,14 @@ export interface ProjectMember {
   user: { id: string; firstName: string; lastName: string; email: string };
 }
 
+export type ProjectRole = 'MANAGER' | 'PENTESTER' | 'CLIENT';
+
+export interface PermissionsResponse {
+  keys: string[];
+  defaults: Record<ProjectRole, Record<string, boolean>>;
+  overrides: Record<string, Record<string, boolean>>;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -464,12 +560,18 @@ export interface Project {
   status: ProjectStatus;
   auditType: AuditType;
   members: ProjectMember[];
-  _count?: { scopes: number };
+  _count?: { scopes: number; tasks?: number };
   createdAt: string;
   updatedAt: string;
 }
 
+export interface KanbanConfig {
+  labels?: Record<string, string>;
+}
+
 export interface ProjectDetail extends Project {
+  rolePermissions?: Record<string, Record<string, boolean>>;
+  kanbanConfig?: KanbanConfig;
   scopes: Scope[];
 }
 

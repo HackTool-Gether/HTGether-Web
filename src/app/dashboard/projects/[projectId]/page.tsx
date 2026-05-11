@@ -21,10 +21,8 @@ import {
   X,
   Loader2,
   FileText,
-  Bug,
   Target,
   Trash2,
-  ArrowRight,
   Pencil,
   Check,
 } from 'lucide-react';
@@ -267,17 +265,21 @@ export default function ProjectDetailPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs">Besoin client</Label>
-                <Input
+                <textarea
                   value={editForm.clientNeed}
                   onChange={(e) => setEditForm({ ...editForm, clientNeed: e.target.value })}
+                  rows={3}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs">Contexte</Label>
-                <Input
+                <textarea
                   value={editForm.context}
                   onChange={(e) => setEditForm({ ...editForm, context: e.target.value })}
+                  rows={3}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
                 />
               </div>
 
@@ -350,19 +352,11 @@ export default function ProjectDetailPage() {
                   <span className="capitalize">{STATUS_PHASE[project.status]}</span>
                 </div>
               </div>
-              <div className="flex gap-2">
-                {canEdit && (
-                  <Button variant="outline" size="sm" onClick={startEditing}>
-                    <Pencil className="mr-1 h-3 w-3" /> Éditer
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/projects/${projectId}/report`)}>
-                  <FileText className="mr-1 h-3 w-3" /> Rapport
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={startEditing}>
+                  <Pencil className="mr-1 h-3 w-3" /> Éditer
                 </Button>
-                <Button size="sm" onClick={() => router.push(`/dashboard/projects/${projectId}/findings`)}>
-                  <Bug className="mr-1 h-3 w-3" /> Findings
-                </Button>
-              </div>
+              )}
             </div>
 
             {/* Progress */}
@@ -517,29 +511,6 @@ export default function ProjectDetailPage() {
               )}
             </div>
 
-            {/* Quick links */}
-            <div className="rounded-xl bg-card p-4">
-              <div className="cap mb-2.5">Vues</div>
-              {[
-                { label: 'Findings', icon: Bug, href: `/dashboard/projects/${projectId}/findings` },
-                { label: 'Rapport', icon: FileText, href: `/dashboard/projects/${projectId}/report` },
-              ].map((l) => {
-                const I = l.icon;
-                return (
-                  <button
-                    key={l.label}
-                    type="button"
-                    onClick={() => router.push(l.href)}
-                    className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-md text-sm text-foreground hover:bg-muted/50 transition-colors"
-                    style={{ fontFamily: 'inherit', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                  >
-                    <I className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="flex-1">{l.label}</span>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                );
-              })}
-            </div>
           </div>
         </div>
       </div>

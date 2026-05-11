@@ -234,20 +234,24 @@ export default function ProjectsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Besoin client</Label>
-                <Input
+                <textarea
                   placeholder="Test d'intrusion de l'application web…"
                   value={form.clientNeed}
                   onChange={(e) => setForm({ ...form, clientNeed: e.target.value })}
                   required
+                  rows={3}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Contexte</Label>
-                <Input
+                <textarea
                   placeholder="Application e-commerce en production…"
                   value={form.context}
                   onChange={(e) => setForm({ ...form, context: e.target.value })}
                   required
+                  rows={3}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

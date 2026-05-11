@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { projectsApi, type Project } from '@/lib/api';
+import { projectsApi, scopesApi, type Project, type Scope } from '@/lib/api';
 import { Avatar } from './avatar';
 import { HtgLogo } from '@/components/ui/htg-logo';
 
@@ -124,12 +124,23 @@ interface ProjectTreeItemProps {
   expanded: boolean;
   onToggle: () => void;
   pathname: string;
+  token: string | null;
 }
 
-function ProjectTreeItem({ project, expanded, onToggle, pathname }: ProjectTreeItemProps) {
+function ProjectTreeItem({ project, expanded, onToggle, pathname, token }: ProjectTreeItemProps) {
   const router = useRouter();
   const base = `/dashboard/projects/${project.id}`;
   const isInThisProject = pathname.startsWith(base);
+  const [scopes, setScopes] = useState<Scope[]>([]);
+
+  useEffect(() => {
+    if (!expanded || !token) { setScopes([]); return; }
+    let cancelled = false;
+    scopesApi.getAll(project.id, token).then((data) => {
+      if (!cancelled) setScopes(data);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [expanded, token, project.id]);
 
   return (
     <div style={{ marginBottom: 2 }}>
@@ -245,10 +256,38 @@ function ProjectTreeItem({ project, expanded, onToggle, pathname }: ProjectTreeI
             active={pathname.startsWith(`${base}/findings`)}
           />
           <ProjectNavItem
+            label="Tâches"
+            href={`${base}/tasks`}
+            active={pathname.startsWith(`${base}/tasks`)}
+          />
+          <ProjectNavItem
             label="Rapport"
             href={`${base}/report`}
             active={pathname.startsWith(`${base}/report`)}
           />
+          <ProjectNavItem
+            label="Membres"
+            href={`${base}/members`}
+            active={pathname.startsWith(`${base}/members`)}
+          />
+          {scopes.length > 0 && (
+            <>
+              <div
+                className="cap"
+                style={{ padding: '8px 10px 4px 38px', fontSize: 10, color: 'var(--fg-subtle)' }}
+              >
+                Périmètres
+              </div>
+              {scopes.map((s) => (
+                <ProjectNavItem
+                  key={s.id}
+                  label={s.name}
+                  href={`${base}/scopes/${s.id}`}
+                  active={pathname.startsWith(`${base}/scopes/${s.id}`)}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -391,6 +430,7 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
                 expanded={!!expanded[p.id]}
                 onToggle={() => toggleProject(p.id)}
                 pathname={pathname}
+                token={token}
               />
             ))}
           </>

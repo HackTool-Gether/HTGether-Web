@@ -8,6 +8,13 @@ import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   projectsApi,
   findingsApi,
   ApiError,
@@ -207,15 +214,19 @@ export default function FindingsListPage() {
                 required
                 className="flex-1 h-8 text-sm"
               />
-              <select
-                className="input h-8 text-sm w-[140px]"
+              <Select
                 value={form.severity}
-                onChange={(e) => setForm({ ...form, severity: e.target.value as Severity })}
+                onValueChange={(v) => setForm({ ...form, severity: v as Severity })}
               >
-                {SEVERITY_ORDER.map((s) => (
-                  <option key={s} value={s}>{s.toLowerCase()}</option>
-                ))}
-              </select>
+                <SelectTrigger className="w-[140px] h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEVERITY_ORDER.map((s) => (
+                    <SelectItem key={s} value={s}>{s.toLowerCase()}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button type="submit" size="sm" disabled={creating}>
                 {creating && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                 Créer
