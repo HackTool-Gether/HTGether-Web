@@ -13,6 +13,7 @@ import {
   type Finding,
   type Report,
   type Severity,
+  type FindingStatus,
 } from '@/lib/api';
 import { ReportProvider } from '@/lib/report-context';
 import {
@@ -21,7 +22,12 @@ import {
   buildReportSlashItems,
 } from '@/components/editor/report-nodes';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
-import { ReportOutline, type OutlineBlock } from '@/components/report/report-outline';
+import {
+  ReportSidebar,
+  type SidebarSection,
+  type SidebarFinding,
+  type ActiveView,
+} from '@/components/report/report-sidebar';
 import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
@@ -29,30 +35,26 @@ import {
   Sparkles,
   FileText,
   ShieldAlert,
-  Table2,
+  Save,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
-interface ReportBlock {
+interface ReportSection {
   id: string;
-  type: 'section' | 'finding' | 'summary';
+  type: string;
   title: string;
   content: any;
-  findingId?: string;
-  severity?: Severity;
+  predefined: boolean;
 }
 
-interface ReportData {
-  version: 2;
-  blocks: ReportBlock[];
+interface ReportDataV3 {
+  version: 3;
+  sections: ReportSection[];
+  findingOrder: string[];
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────
-
-function uid(): string {
-  return crypto.randomUUID();
-}
+// ── Constants ───────────────────────────────────────────────────────────
 
 const SEV_ORDER: Severity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
 
@@ -72,6 +74,13 @@ const SEV_COLOR: Record<Severity, string> = {
   INFO: 'var(--sev-info-fg)',
 };
 
+const STATUS_OPTIONS: { value: FindingStatus; label: string }[] = [
+  { value: 'DRAFT', label: 'Brouillon' },
+  { value: 'CONFIRMED', label: 'Confirmé' },
+  { value: 'FALSE_POSITIVE', label: 'Faux positif' },
+  { value: 'FIXED', label: 'Corrigé' },
+];
+
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Brouillon',
   CONFIRMED: 'Confirmé',
@@ -79,103 +88,77 @@ const STATUS_LABEL: Record<string, string> = {
   FIXED: 'Corrigé',
 };
 
-function migrateContent(raw: any): ReportData {
-  if (!raw) return { version: 2, blocks: [] };
-  if (raw.version === 2 && Array.isArray(raw.blocks)) return raw as ReportData;
+const PREDEFINED_SECTIONS: Omit<ReportSection, 'id'>[] = [
+  { type: 'executive_summary', title: 'Synthèse exécutive', content: null, predefined: true },
+  { type: 'scope', title: 'Périmètre', content: null, predefined: true },
+  { type: 'methodology', title: 'Méthodologie', content: null, predefined: true },
+  { type: 'recommendations', title: 'Recommandations', content: null, predefined: true },
+  { type: 'conclusion', title: 'Conclusion', content: null, predefined: true },
+];
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+function uid(): string {
+  return crypto.randomUUID();
+}
+
+function migrateContent(raw: any, findings: Finding[]): ReportDataV3 {
+  if (!raw) return makeDefault(findings);
+
+  if (raw.version === 3 && Array.isArray(raw.sections)) {
+    return raw as ReportDataV3;
+  }
+
+  if (raw.version === 2 && Array.isArray(raw.blocks)) {
+    const sections: ReportSection[] = [];
+    const findingOrder: string[] = [];
+    for (const block of raw.blocks) {
+      if (block.type === 'section' || block.type === 'summary') {
+        sections.push({
+          id: block.id || uid(),
+          type: 'custom',
+          title: block.title || 'Section importée',
+          content: block.content,
+          predefined: false,
+        });
+      } else if (block.type === 'finding' && block.findingId) {
+        findingOrder.push(block.findingId);
+      }
+    }
+    if (sections.length === 0) {
+      return makeDefault(findings);
+    }
+    return { version: 3, sections, findingOrder };
+  }
+
   if (raw.type === 'doc') {
-    return {
-      version: 2,
-      blocks: [
-        {
-          id: uid(),
-          type: 'section',
-          title: 'Contenu importé',
-          content: raw,
-        },
-      ],
-    };
+    const defaultData = makeDefault(findings);
+    defaultData.sections[0].content = raw;
+    return defaultData;
   }
-  return { version: 2, blocks: [] };
+
+  return makeDefault(findings);
 }
 
-function buildFindingContent(f: Finding): any {
-  const nodes: any[] = [];
-
-  if (f.description) {
-    nodes.push(
-      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Description' }] },
-      { type: 'paragraph', content: [{ type: 'text', text: f.description }] },
-    );
-  }
-
-  if (f.proof) {
-    nodes.push(
-      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Preuve' }] },
-      { type: 'paragraph', content: [{ type: 'text', text: f.proof }] },
-    );
-  }
-
-  if (f.impact) {
-    nodes.push(
-      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Impact' }] },
-      { type: 'paragraph', content: [{ type: 'text', text: f.impact }] },
-    );
-  }
-
-  if (f.remediation) {
-    nodes.push(
-      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Remédiation' }] },
-      { type: 'paragraph', content: [{ type: 'text', text: f.remediation }] },
-    );
-  }
-
-  if (f.references) {
-    nodes.push(
-      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Références' }] },
-      { type: 'paragraph', content: [{ type: 'text', text: f.references }] },
-    );
-  }
-
-  if (nodes.length === 0) {
-    nodes.push({ type: 'paragraph' });
-  }
-
-  return { type: 'doc', content: nodes };
-}
-
-function generateTemplate(findings: Finding[]): ReportBlock[] {
-  const sorted = [...findings].sort(
-    (a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity),
-  );
-
-  const blocks: ReportBlock[] = [
-    { id: uid(), type: 'section', title: 'Introduction', content: null },
-    { id: uid(), type: 'section', title: 'Périmètre et méthodologie', content: null },
-    { id: uid(), type: 'summary', title: 'Synthèse des vulnérabilités', content: null },
-  ];
-
-  for (const f of sorted) {
-    blocks.push({
-      id: uid(),
-      type: 'finding',
-      title: f.slug ? `${f.slug} — ${f.title}` : f.title,
-      content: buildFindingContent(f),
-      findingId: f.id,
-      severity: f.severity,
-    });
-  }
-
-  blocks.push(
-    { id: uid(), type: 'section', title: 'Recommandations', content: null },
-    { id: uid(), type: 'section', title: 'Conclusion', content: null },
-  );
-
-  return blocks;
+function makeDefault(findings: Finding[]): ReportDataV3 {
+  return {
+    version: 3,
+    sections: PREDEFINED_SECTIONS.map((s) => ({ ...s, id: uid() })),
+    findingOrder: [...findings]
+      .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity))
+      .map((f) => f.id),
+  };
 }
 
 // ── Finding metadata bar ────────────────────────────────────────────────
 
-function FindingMeta({ finding }: { finding: Finding }) {
+function FindingMeta({
+  finding,
+  onUpdate,
+}: {
+  finding: Finding;
+  onUpdate: (field: string, value: any) => void;
+}) {
   const c = SEV_COLOR[finding.severity];
 
   return (
@@ -183,49 +166,97 @@ function FindingMeta({ finding }: { finding: Finding }) {
       style={{
         display: 'flex',
         flexWrap: 'wrap',
-        gap: 8,
-        padding: '10px 16px',
+        gap: 12,
+        padding: '12px 16px',
         background: `color-mix(in oklch, ${c} 6%, var(--bg-elevated))`,
         borderRadius: 'var(--r-md)',
         borderLeft: `3px solid ${c}`,
-        marginBottom: 16,
+        marginBottom: 20,
         alignItems: 'center',
       }}
     >
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          padding: '2px 8px',
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-          color: c,
-          background: `color-mix(in oklch, ${c} 15%, transparent)`,
-          border: `1px solid color-mix(in oklch, ${c} 30%, transparent)`,
-        }}
-      >
-        {SEV_LABEL[finding.severity]}
-      </span>
+      {/* Severity select */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 11, color: 'var(--fg-subtle)', fontWeight: 500 }}>Sévérité</span>
+        <select
+          value={finding.severity}
+          onChange={(e) => onUpdate('severity', e.target.value)}
+          style={{
+            padding: '2px 6px',
+            borderRadius: 'var(--r-sm)',
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            color: c,
+            background: `color-mix(in oklch, ${c} 12%, transparent)`,
+            border: `1px solid color-mix(in oklch, ${c} 25%, transparent)`,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          {SEV_ORDER.map((s) => (
+            <option key={s} value={s}>{SEV_LABEL[s]}</option>
+          ))}
+        </select>
+      </div>
 
-      {finding.cvssScore != null && (
-        <span className="font-mono" style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-          CVSS {finding.cvssScore.toFixed(1)}
-        </span>
-      )}
+      {/* CVSS */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 11, color: 'var(--fg-subtle)', fontWeight: 500 }}>CVSS</span>
+        <input
+          type="number"
+          min={0}
+          max={10}
+          step={0.1}
+          value={finding.cvssScore ?? ''}
+          onChange={(e) => onUpdate('cvssScore', e.target.value ? parseFloat(e.target.value) : null)}
+          placeholder="—"
+          className="font-mono"
+          style={{
+            width: 52,
+            padding: '2px 6px',
+            fontSize: 12,
+            background: 'var(--bg-input)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--r-sm)',
+            color: 'var(--fg)',
+            fontFamily: 'inherit',
+          }}
+        />
+      </div>
 
-      <span style={{ fontSize: 12, color: 'var(--fg-subtle)' }}>
-        {STATUS_LABEL[finding.status] || finding.status}
-      </span>
+      {/* Status */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 11, color: 'var(--fg-subtle)', fontWeight: 500 }}>Statut</span>
+        <select
+          value={finding.status}
+          onChange={(e) => onUpdate('status', e.target.value)}
+          style={{
+            padding: '2px 8px',
+            borderRadius: 'var(--r-sm)',
+            fontSize: 11.5,
+            background: 'var(--bg-input)',
+            border: '1px solid var(--border)',
+            color: 'var(--fg)',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
 
+      {/* Component */}
       {finding.component && (
         <span style={{ fontSize: 12, color: 'var(--fg-subtle)' }}>
           {finding.component.name}
         </span>
       )}
 
+      {/* Slug */}
       {finding.slug && (
         <span className="font-mono" style={{ fontSize: 11, color: 'var(--fg-subtle)', marginLeft: 'auto' }}>
           {finding.slug}
@@ -235,7 +266,234 @@ function FindingMeta({ finding }: { finding: Finding }) {
   );
 }
 
-// ── Findings summary table (for summary blocks) ────────────────────────
+// ── Finding structured field ────────────────────────────────────────────
+
+function FindingField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.max(80, el.scrollHeight) + 'px';
+  }, []);
+
+  useEffect(() => {
+    autoResize();
+  }, [value, autoResize]);
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <label
+        style={{
+          display: 'block',
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--fg-muted)',
+          marginBottom: 6,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        {label}
+      </label>
+      <textarea
+        ref={ref}
+        value={value || ''}
+        onChange={(e) => {
+          onChange(e.target.value);
+          autoResize();
+        }}
+        placeholder={placeholder || `${label}…`}
+        style={{
+          width: '100%',
+          minHeight: 80,
+          padding: '12px 14px',
+          fontSize: 13,
+          lineHeight: 1.6,
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-md)',
+          color: 'var(--fg)',
+          resize: 'vertical',
+          fontFamily: 'inherit',
+          outline: 'none',
+          transition: 'border-color 0.15s',
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = 'var(--accent)';
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = 'var(--border)';
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Section editor ──────────────────────────────────────────────────────
+
+function SectionEditor({
+  section,
+  onTitleChange,
+  onContentChange,
+  extraExtensions,
+  extraSlashItems,
+}: {
+  section: ReportSection;
+  onTitleChange: (title: string) => void;
+  onContentChange: (raw: string) => void;
+  extraExtensions: any[];
+  extraSlashItems: any[];
+}) {
+  return (
+    <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 8,
+          color: 'var(--fg-subtle)',
+          fontSize: 11,
+        }}
+      >
+        <FileText size={12} />
+        {section.predefined ? 'Section prédéfinie' : 'Section personnalisée'}
+      </div>
+
+      <input
+        value={section.title}
+        onChange={(e) => onTitleChange(e.target.value)}
+        placeholder="Titre de la section"
+        style={{
+          width: '100%',
+          fontSize: 24,
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          color: 'var(--fg)',
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          padding: 0,
+          marginBottom: 20,
+          fontFamily: 'inherit',
+        }}
+      />
+
+      <div
+        style={{
+          padding: '20px 24px',
+          background: 'var(--bg-elevated)',
+          borderRadius: 'var(--r-lg)',
+          minHeight: 400,
+        }}
+      >
+        <RichTextEditor
+          key={section.id}
+          content={section.content ? JSON.stringify(section.content) : ''}
+          onChange={onContentChange}
+          storageMode="json"
+          placeholder="Commencez à écrire… (tapez / pour les commandes)"
+          extraExtensions={extraExtensions}
+          extraSlashItems={extraSlashItems}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Finding editor ──────────────────────────────────────────────────────
+
+function FindingEditor({
+  finding,
+  onUpdate,
+}: {
+  finding: Finding;
+  onUpdate: (field: string, value: any) => void;
+}) {
+  return (
+    <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 8,
+          color: 'var(--fg-subtle)',
+          fontSize: 11,
+        }}
+      >
+        <ShieldAlert size={12} />
+        Vulnérabilité
+      </div>
+
+      <input
+        value={finding.title}
+        onChange={(e) => onUpdate('title', e.target.value)}
+        placeholder="Titre de la vulnérabilité"
+        style={{
+          width: '100%',
+          fontSize: 24,
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          color: 'var(--fg)',
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          padding: 0,
+          marginBottom: 16,
+          fontFamily: 'inherit',
+        }}
+      />
+
+      <FindingMeta finding={finding} onUpdate={onUpdate} />
+
+      <FindingField
+        label="Description"
+        value={finding.description}
+        onChange={(v) => onUpdate('description', v)}
+        placeholder="Décrivez la vulnérabilité découverte…"
+      />
+      <FindingField
+        label="Preuve"
+        value={finding.proof || ''}
+        onChange={(v) => onUpdate('proof', v)}
+        placeholder="Étapes de reproduction, captures, logs…"
+      />
+      <FindingField
+        label="Impact"
+        value={finding.impact || ''}
+        onChange={(v) => onUpdate('impact', v)}
+        placeholder="Impact sur la confidentialité, intégrité, disponibilité…"
+      />
+      <FindingField
+        label="Remédiation"
+        value={finding.remediation || ''}
+        onChange={(v) => onUpdate('remediation', v)}
+        placeholder="Mesures correctives recommandées…"
+      />
+      <FindingField
+        label="Références"
+        value={finding.references || ''}
+        onChange={(v) => onUpdate('references', v)}
+        placeholder="CVE, CWE, OWASP, liens externes…"
+      />
+    </div>
+  );
+}
+
+// ── Findings summary table ──────────────────────────────────────────────
 
 function FindingsSummaryTable({ findings }: { findings: Finding[] }) {
   const sorted = [...findings].sort(
@@ -351,12 +609,13 @@ function EmptyState({ onGenerate, findingsCount }: { onGenerate: () => void; fin
           Commencez votre rapport
         </div>
         <div style={{ fontSize: 13 }}>
-          Ajoutez des blocs manuellement ou générez la structure automatiquement
+          Les sections prédéfinies seront créées automatiquement.
+          {findingsCount > 0 && ` ${findingsCount} vulnérabilité${findingsCount > 1 ? 's' : ''} disponible${findingsCount > 1 ? 's' : ''}.`}
         </div>
       </div>
       <Button onClick={onGenerate} size="sm" style={{ marginTop: 8 }}>
         <Sparkles className="mr-2 h-3.5 w-3.5" />
-        Générer la structure {findingsCount > 0 && `(${findingsCount} findings)`}
+        Initialiser le rapport
       </Button>
     </div>
   );
@@ -374,12 +633,15 @@ export default function ProjectReportPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [report, setReport] = useState<Report | null>(null);
-  const [blocks, setBlocks] = useState<ReportBlock[]>([]);
-  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [sections, setSections] = useState<ReportSection[]>([]);
+  const [findingOrder, setFindingOrder] = useState<string[]>([]);
+  const [activeView, setActiveView] = useState<ActiveView>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const findingSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const extraExtensions = useMemo(() => [VariableNode, FindingsTableNode], []);
   const extraSlashItems = useMemo(() => buildReportSlashItems(), []);
@@ -403,9 +665,14 @@ export default function ProjectReportPage() {
 
         const data = migrateContent(
           rep.content && typeof rep.content === 'object' ? rep.content : null,
+          fdg,
         );
-        setBlocks(data.blocks);
-        if (data.blocks.length > 0) setActiveBlockId(data.blocks[0].id);
+        setSections(data.sections);
+        setFindingOrder(data.findingOrder);
+
+        if (data.sections.length > 0) {
+          setActiveView({ kind: 'section', id: data.sections[0].id });
+        }
       } catch (err) {
         if (!mounted) return;
         setError(err instanceof ApiError ? err.message : 'Erreur de chargement');
@@ -423,12 +690,12 @@ export default function ProjectReportPage() {
     return () => setActiveProject(null);
   }, [project, findings.length, setActiveProject]);
 
-  // ── Save logic ──
+  // ── Save report sections ──
 
-  const persist = useCallback(
-    (blocksToSave: ReportBlock[]) => {
+  const persistReport = useCallback(
+    (sectionsToSave: ReportSection[], orderToSave: string[]) => {
       if (!token || !report) return;
-      const data: ReportData = { version: 2, blocks: blocksToSave };
+      const data: ReportDataV3 = { version: 3, sections: sectionsToSave, findingOrder: orderToSave };
       setSaveState('saving');
       reportsApi
         .update(projectId, data, token)
@@ -438,147 +705,148 @@ export default function ProjectReportPage() {
     [token, report, projectId],
   );
 
-  const scheduleSave = useCallback(
-    (nextBlocks: ReportBlock[]) => {
+  const scheduleSaveReport = useCallback(
+    (nextSections: ReportSection[], nextOrder: string[]) => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => persist(nextBlocks), 1200);
+      saveTimer.current = setTimeout(() => persistReport(nextSections, nextOrder), 1200);
     },
-    [persist],
+    [persistReport],
   );
 
-  const updateBlocks = useCallback(
-    (nextBlocks: ReportBlock[]) => {
-      setBlocks(nextBlocks);
-      scheduleSave(nextBlocks);
+  // ── Save finding changes ──
+
+  const persistFinding = useCallback(
+    (findingId: string, updates: Partial<Finding>) => {
+      if (!token) return;
+      setSaveState('saving');
+      findingsApi
+        .update(findingId, updates, token)
+        .then((updated) => {
+          setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+          setSaveState('saved');
+        })
+        .catch(() => setSaveState('error'));
     },
-    [scheduleSave],
+    [token],
   );
 
-  // ── Block CRUD ──
+  const scheduleSaveFinding = useCallback(
+    (findingId: string, updates: Partial<Finding>) => {
+      if (findingSaveTimer.current) clearTimeout(findingSaveTimer.current);
+      findingSaveTimer.current = setTimeout(() => persistFinding(findingId, updates), 1200);
+    },
+    [persistFinding],
+  );
+
+  // ── Section CRUD ──
+
+  const updateSections = useCallback(
+    (nextSections: ReportSection[]) => {
+      setSections(nextSections);
+      scheduleSaveReport(nextSections, findingOrder);
+    },
+    [scheduleSaveReport, findingOrder],
+  );
 
   const addSection = useCallback(() => {
-    const block: ReportBlock = { id: uid(), type: 'section', title: 'Nouvelle section', content: null };
-    const next = [...blocks, block];
-    updateBlocks(next);
-    setActiveBlockId(block.id);
-  }, [blocks, updateBlocks]);
-
-  const addSummary = useCallback(() => {
-    const block: ReportBlock = { id: uid(), type: 'summary', title: 'Synthèse des vulnérabilités', content: null };
-    const next = [...blocks, block];
-    updateBlocks(next);
-    setActiveBlockId(block.id);
-  }, [blocks, updateBlocks]);
-
-  const importFinding = useCallback(
-    (findingId: string) => {
-      const f = findings.find((x) => x.id === findingId);
-      if (!f) return;
-      const block: ReportBlock = {
-        id: uid(),
-        type: 'finding',
-        title: f.slug ? `${f.slug} — ${f.title}` : f.title,
-        content: buildFindingContent(f),
-        findingId: f.id,
-        severity: f.severity,
-      };
-      const next = [...blocks, block];
-      updateBlocks(next);
-      setActiveBlockId(block.id);
-    },
-    [blocks, findings, updateBlocks],
-  );
-
-  const importAllFindings = useCallback(() => {
-    const imported = new Set(blocks.filter((b) => b.findingId).map((b) => b.findingId));
-    const available = findings.filter((f) => !imported.has(f.id));
-    const sorted = [...available].sort(
-      (a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity),
-    );
-    const newBlocks = sorted.map((f): ReportBlock => ({
+    const sec: ReportSection = {
       id: uid(),
-      type: 'finding',
-      title: f.slug ? `${f.slug} — ${f.title}` : f.title,
-      content: buildFindingContent(f),
-      findingId: f.id,
-      severity: f.severity,
-    }));
-    const next = [...blocks, ...newBlocks];
-    updateBlocks(next);
-    if (newBlocks.length > 0) setActiveBlockId(newBlocks[0].id);
-  }, [blocks, findings, updateBlocks]);
+      type: 'custom',
+      title: 'Nouvelle section',
+      content: null,
+      predefined: false,
+    };
+    const next = [...sections, sec];
+    updateSections(next);
+    setActiveView({ kind: 'section', id: sec.id });
+  }, [sections, updateSections]);
 
-  const handleGenerate = useCallback(() => {
-    const generated = generateTemplate(findings);
-    updateBlocks(generated);
-    if (generated.length > 0) setActiveBlockId(generated[0].id);
-  }, [findings, updateBlocks]);
-
-  const deleteBlock = useCallback(
+  const deleteSection = useCallback(
     (id: string) => {
-      const next = blocks.filter((b) => b.id !== id);
-      updateBlocks(next);
-      if (activeBlockId === id) {
-        setActiveBlockId(next.length > 0 ? next[0].id : null);
+      const next = sections.filter((s) => s.id !== id);
+      updateSections(next);
+      if (activeView?.kind === 'section' && activeView.id === id) {
+        setActiveView(next.length > 0 ? { kind: 'section', id: next[0].id } : null);
       }
     },
-    [blocks, activeBlockId, updateBlocks],
+    [sections, activeView, updateSections],
   );
 
-  const reorderBlocks = useCallback(
-    (ids: string[]) => {
-      const map = new Map(blocks.map((b) => [b.id, b]));
-      const next = ids.map((id) => map.get(id)!).filter(Boolean);
-      updateBlocks(next);
+  const updateSectionTitle = useCallback(
+    (id: string, title: string) => {
+      const next = sections.map((s) => (s.id === id ? { ...s, title } : s));
+      updateSections(next);
     },
-    [blocks, updateBlocks],
+    [sections, updateSections],
   );
 
-  const updateBlockContent = useCallback(
+  const updateSectionContent = useCallback(
     (id: string, raw: string) => {
       let parsed: any = null;
       try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = null; }
-      setBlocks((prev) => {
-        const next = prev.map((b) => (b.id === id ? { ...b, content: parsed } : b));
-        scheduleSave(next);
+      setSections((prev) => {
+        const next = prev.map((s) => (s.id === id ? { ...s, content: parsed } : s));
+        scheduleSaveReport(next, findingOrder);
         return next;
       });
     },
-    [scheduleSave],
+    [scheduleSaveReport, findingOrder],
   );
 
-  const updateBlockTitle = useCallback(
-    (id: string, title: string) => {
-      const next = blocks.map((b) => (b.id === id ? { ...b, title } : b));
-      updateBlocks(next);
+  // ── Finding update handler ──
+
+  const handleFindingUpdate = useCallback(
+    (findingId: string, field: string, value: any) => {
+      setFindings((prev) =>
+        prev.map((f) => (f.id === findingId ? { ...f, [field]: value } : f)),
+      );
+      scheduleSaveFinding(findingId, { [field]: value });
     },
-    [blocks, updateBlocks],
+    [scheduleSaveFinding],
   );
 
-  // ── Derived state ──
+  // ── Initialize report ──
 
-  const activeBlock = blocks.find((b) => b.id === activeBlockId) || null;
-  const activeFinding = activeBlock?.findingId
-    ? findings.find((f) => f.id === activeBlock.findingId) || null
+  const handleInitialize = useCallback(() => {
+    const defaultSections = PREDEFINED_SECTIONS.map((s) => ({ ...s, id: uid() }));
+    const order = [...findings]
+      .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity))
+      .map((f) => f.id);
+    setSections(defaultSections);
+    setFindingOrder(order);
+    scheduleSaveReport(defaultSections, order);
+    if (defaultSections.length > 0) {
+      setActiveView({ kind: 'section', id: defaultSections[0].id });
+    }
+  }, [findings, scheduleSaveReport]);
+
+  // ── Derived data for sidebar ──
+
+  const sidebarSections: SidebarSection[] = useMemo(
+    () => sections.map((s) => ({ id: s.id, type: s.type, title: s.title, predefined: s.predefined })),
+    [sections],
+  );
+
+  const sidebarFindings: SidebarFinding[] = useMemo(
+    () => findings
+      .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity))
+      .map((f) => ({
+        id: f.id,
+        title: f.title,
+        slug: f.slug,
+        severity: f.severity,
+        status: f.status,
+      })),
+    [findings],
+  );
+
+  const activeSection = activeView?.kind === 'section'
+    ? sections.find((s) => s.id === activeView.id) || null
     : null;
 
-  const importedFindingIds = useMemo(
-    () => new Set(blocks.filter((b) => b.findingId).map((b) => b.findingId)),
-    [blocks],
-  );
-
-  const availableFindings = useMemo(
-    () =>
-      findings
-        .filter((f) => !importedFindingIds.has(f.id))
-        .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity)),
-    [findings, importedFindingIds],
-  );
-
-  const outlineItems: OutlineBlock[] = useMemo(
-    () => blocks.map((b) => ({ id: b.id, type: b.type, title: b.title, severity: b.severity })),
-    [blocks],
-  );
+  const activeFinding = activeView?.kind === 'finding'
+    ? findings.find((f) => f.id === activeView.id) || null
+    : null;
 
   // ── Render ──
 
@@ -623,7 +891,7 @@ export default function ProjectReportPage() {
               {saveState === 'error' && 'erreur'}
             </span>
             <span className="font-mono text-[11px] text-muted-foreground">
-              {blocks.length} bloc{blocks.length !== 1 ? 's' : ''}
+              {sections.length} section{sections.length !== 1 ? 's' : ''} · {findings.length} finding{findings.length !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
@@ -634,9 +902,9 @@ export default function ProjectReportPage() {
           </div>
         )}
 
-        {/* Main content */}
+        {/* Main content: sidebar + editor */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Outline sidebar */}
+          {/* Sidebar */}
           <div
             style={{
               width: 260,
@@ -647,117 +915,49 @@ export default function ProjectReportPage() {
               flexDirection: 'column',
             }}
           >
-            <ReportOutline
-              items={outlineItems}
-              activeId={activeBlockId}
-              onSelect={setActiveBlockId}
-              onReorder={reorderBlocks}
-              onDelete={deleteBlock}
+            <ReportSidebar
+              sections={sidebarSections}
+              findings={sidebarFindings}
+              activeView={activeView}
+              onSelectSection={(id) => setActiveView({ kind: 'section', id })}
+              onSelectFinding={(id) => setActiveView({ kind: 'finding', id })}
               onAddSection={addSection}
-              onAddSummary={addSummary}
-              onImportFinding={importFinding}
-              onImportAllFindings={importAllFindings}
-              onGenerate={handleGenerate}
-              availableFindings={availableFindings.map((f) => ({
-                id: f.id,
-                title: f.title,
-                severity: f.severity,
-                slug: f.slug,
-              }))}
+              onDeleteSection={deleteSection}
             />
           </div>
 
           {/* Editor area */}
           <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-            {blocks.length === 0 ? (
-              <EmptyState onGenerate={handleGenerate} findingsCount={findings.length} />
-            ) : activeBlock ? (
-              <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
-                {/* Block type indicator */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginBottom: 8,
-                    color: 'var(--fg-subtle)',
-                    fontSize: 11,
-                  }}
-                >
-                  {activeBlock.type === 'section' && <><FileText size={12} /> Section</>}
-                  {activeBlock.type === 'finding' && <><ShieldAlert size={12} /> Finding</>}
-                  {activeBlock.type === 'summary' && <><Table2 size={12} /> Synthèse</>}
-                </div>
-
-                {/* Editable title */}
-                {activeBlock.type !== 'summary' && (
-                  <input
-                    value={activeBlock.title}
-                    onChange={(e) => updateBlockTitle(activeBlock.id, e.target.value)}
-                    placeholder="Titre du bloc"
-                    style={{
-                      width: '100%',
-                      fontSize: 24,
-                      fontWeight: 700,
-                      letterSpacing: '-0.02em',
-                      color: 'var(--fg)',
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      padding: 0,
-                      marginBottom: 16,
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                )}
-
-                {/* Finding metadata */}
-                {activeBlock.type === 'finding' && activeFinding && (
-                  <FindingMeta finding={activeFinding} />
-                )}
-
-                {/* Summary table (no editor) */}
-                {activeBlock.type === 'summary' ? (
-                  <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: 'var(--fg)' }}>
-                      {activeBlock.title}
-                    </h2>
-                    <FindingsSummaryTable findings={findings} />
-                  </div>
-                ) : (
-                  /* Rich text editor */
-                  <div
-                    style={{
-                      padding: '20px 24px',
-                      background: 'var(--bg-elevated)',
-                      borderRadius: 'var(--r-lg)',
-                      minHeight: 400,
-                    }}
-                  >
-                    <RichTextEditor
-                      key={activeBlock.id}
-                      content={activeBlock.content ? JSON.stringify(activeBlock.content) : ''}
-                      onChange={(raw) => updateBlockContent(activeBlock.id, raw)}
-                      storageMode="json"
-                      placeholder="Commencez à écrire… (tapez / pour les commandes)"
-                      extraExtensions={extraExtensions}
-                      extraSlashItems={extraSlashItems}
-                    />
-                  </div>
-                )}
-              </div>
+            {sections.length === 0 && findings.length === 0 ? (
+              <EmptyState onGenerate={handleInitialize} findingsCount={findings.length} />
+            ) : activeSection ? (
+              <SectionEditor
+                section={activeSection}
+                onTitleChange={(title) => updateSectionTitle(activeSection.id, title)}
+                onContentChange={(raw) => updateSectionContent(activeSection.id, raw)}
+                extraExtensions={extraExtensions}
+                extraSlashItems={extraSlashItems}
+              />
+            ) : activeFinding ? (
+              <FindingEditor
+                finding={activeFinding}
+                onUpdate={(field, value) => handleFindingUpdate(activeFinding.id, field, value)}
+              />
             ) : (
               <div
                 style={{
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   height: '100%',
                   color: 'var(--fg-subtle)',
                   fontSize: 13,
+                  gap: 8,
                 }}
               >
-                Sélectionnez un bloc dans le plan
+                <FileText size={32} style={{ opacity: 0.15 }} />
+                Sélectionnez une section ou un finding
               </div>
             )}
           </div>
