@@ -261,6 +261,11 @@ function ProjectTreeItem({ project, expanded, onToggle, pathname, token }: Proje
             active={pathname.startsWith(`${base}/tasks`)}
           />
           <ProjectNavItem
+            label="Messages"
+            href={`${base}/messages`}
+            active={pathname.startsWith(`${base}/messages`)}
+          />
+          <ProjectNavItem
             label="Rapport"
             href={`${base}/report`}
             active={pathname.startsWith(`${base}/report`)}

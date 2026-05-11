@@ -413,6 +413,59 @@ export const tasksApi = {
     apiRequest<void>(`/tasks/${id}`, { method: 'DELETE', token }),
 };
 
+// Conversations / Messages API
+export interface ConversationUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface MessageSender {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface Message {
+  id: string;
+  content: string;
+  createdAt: string;
+  conversationId: string;
+  senderId: string;
+  sender: MessageSender;
+}
+
+export interface Conversation {
+  id: string;
+  projectId: string;
+  user1: ConversationUser;
+  user2: ConversationUser;
+  lastMessage: Message | null;
+  updatedAt: string;
+}
+
+export const conversationsApi = {
+  getByProject: (projectId: string, token: string) =>
+    apiRequest<Conversation[]>(`/projects/${projectId}/conversations`, { token }),
+
+  getOrCreate: (projectId: string, targetUserId: string, token: string) =>
+    apiRequest<{ id: string; projectId: string; user1: ConversationUser; user2: ConversationUser }>(
+      `/projects/${projectId}/conversations`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId }),
+        token,
+      },
+    ),
+
+  getMessages: (conversationId: string, token: string, cursor?: string) =>
+    apiRequest<Message[]>(
+      `/conversations/${conversationId}/messages${cursor ? `?cursor=${cursor}` : ''}`,
+      { token },
+    ),
+};
+
 // Reports API
 export interface Report {
   id: string;

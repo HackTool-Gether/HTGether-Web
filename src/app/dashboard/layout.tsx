@@ -4,13 +4,16 @@ import { AuthGuard } from '@/components/auth-guard';
 import { Sidebar } from '@/components/shell/sidebar';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { ShellProvider, useShell } from '@/components/shell/shell-context';
+import { SocketProvider } from '@/lib/socket-context';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-      <ShellProvider>
-        <Shell>{children}</Shell>
-      </ShellProvider>
+      <SocketProvider>
+        <ShellProvider>
+          <Shell>{children}</Shell>
+        </ShellProvider>
+      </SocketProvider>
     </AuthGuard>
   );
 }
