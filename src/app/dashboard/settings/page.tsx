@@ -72,7 +72,7 @@ const SSO_PRESETS = [
 
 export default function SettingsPage() {
   const { user, token } = useAuth();
-  const { isWhiteMode, toggleWhiteMode } = useThemePreference();
+  const { preference, setPreference } = useThemePreference();
   const [activeTab, setActiveTab] = useState<TabId>('preferences');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -424,22 +424,72 @@ export default function SettingsPage() {
       {activeTab === 'preferences' && (
         <Card>
           <CardHeader>
-            <CardTitle>Preferences d'affichage</CardTitle>
-            <CardDescription>Personnalisez le mode visuel de la plateforme</CardDescription>
+            <CardTitle>Apparence</CardTitle>
+            <CardDescription>Choisissez le thème de la plateforme</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between rounded-lg bg-secondary p-4">
-              <div className="space-y-1">
-                <Label htmlFor="whiteMode" className="text-sm font-medium">White mode</Label>
-                <p className="text-sm text-muted-foreground">
-                  Active une interface claire
-                </p>
-              </div>
-              <Switch
-                id="whiteMode"
-                checked={isWhiteMode}
-                onCheckedChange={toggleWhiteMode}
-              />
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                { value: 'system' as const, label: 'Système', desc: 'Suit les préférences OS' },
+                { value: 'dark' as const, label: 'Sombre', desc: 'Thème sombre' },
+                { value: 'light' as const, label: 'Clair', desc: 'Thème clair' },
+              ]).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setPreference(opt.value)}
+                  className="flex flex-col items-center gap-2 rounded-lg border p-4 text-center transition-colors"
+                  style={{
+                    borderColor: preference === opt.value ? 'var(--accent)' : 'var(--border)',
+                    background: preference === opt.value ? 'var(--accent-tint)' : 'var(--bg-subtle)',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <div
+                    className="w-full h-16 rounded-md border overflow-hidden"
+                    style={{
+                      borderColor: 'var(--border-subtle)',
+                      background: opt.value === 'dark'
+                        ? '#010102'
+                        : opt.value === 'light'
+                          ? '#ffffff'
+                          : 'linear-gradient(135deg, #010102 50%, #ffffff 50%)',
+                    }}
+                  >
+                    <div className="flex flex-col gap-1 p-2">
+                      <div
+                        className="h-1.5 w-8 rounded-full"
+                        style={{
+                          background: opt.value === 'light'
+                            ? '#d8dbe0'
+                            : '#23252a',
+                        }}
+                      />
+                      <div
+                        className="h-1.5 w-12 rounded-full"
+                        style={{
+                          background: opt.value === 'light'
+                            ? '#d8dbe0'
+                            : '#23252a',
+                        }}
+                      />
+                      <div
+                        className="h-1.5 w-6 rounded-full"
+                        style={{
+                          background: opt.value === 'light'
+                            ? '#d8dbe0'
+                            : '#23252a',
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">{opt.label}</div>
+                    <div className="text-xs text-muted-foreground">{opt.desc}</div>
+                  </div>
+                </button>
+              ))}
             </div>
           </CardContent>
         </Card>

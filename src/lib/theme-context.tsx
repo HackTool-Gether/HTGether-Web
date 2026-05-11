@@ -2,61 +2,92 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-type Theme = 'dark' | 'light';
+type ThemePreference = 'system' | 'dark' | 'light';
+type ResolvedTheme = 'dark' | 'light';
 
 type ThemeContextValue = {
-  theme: Theme;
+  preference: ThemePreference;
+  theme: ResolvedTheme;
   isWhiteMode: boolean;
-  setTheme: (theme: Theme) => void;
+  setPreference: (pref: ThemePreference) => void;
   toggleWhiteMode: (enabled: boolean) => void;
 };
 
 const STORAGE_KEY = 'htg-theme';
 
-const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
 
-function applyThemeToDocument(theme: Theme) {
+function resolveTheme(pref: ThemePreference): ResolvedTheme {
+  if (pref === 'system') return getSystemTheme();
+  return pref;
+}
+
+function applyThemeToDocument(theme: ResolvedTheme) {
   const root = document.documentElement;
   root.classList.toggle('dark', theme === 'dark');
   root.classList.toggle('light', theme === 'light');
   root.setAttribute('data-theme', theme);
 }
 
+function readPreference(): ThemePreference {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY);
+    if (v === 'light' || v === 'dark' || v === 'system') return v;
+  } catch {}
+  return 'system';
+}
+
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark');
+  const [preference, setPreferenceState] = useState<ThemePreference>(() => readPreference());
+  const [resolved, setResolved] = useState<ResolvedTheme>(() => resolveTheme(readPreference()));
 
   useEffect(() => {
-    try {
-      const savedTheme = localStorage.getItem(STORAGE_KEY);
-      const resolvedTheme: Theme = savedTheme === 'light' ? 'light' : 'dark';
-      setThemeState(resolvedTheme);
-      applyThemeToDocument(resolvedTheme);
-    } catch {
-      setThemeState('dark');
-      applyThemeToDocument('dark');
-    }
+    const pref = readPreference();
+    setPreferenceState(pref);
+    const theme = resolveTheme(pref);
+    setResolved(theme);
+    applyThemeToDocument(theme);
   }, []);
 
-  const setTheme = useCallback((nextTheme: Theme) => {
-    setThemeState(nextTheme);
-    applyThemeToDocument(nextTheme);
+  useEffect(() => {
+    if (preference !== 'system') return;
+
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const handler = () => {
+      const theme = getSystemTheme();
+      setResolved(theme);
+      applyThemeToDocument(theme);
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [preference]);
+
+  const setPreference = useCallback((pref: ThemePreference) => {
+    setPreferenceState(pref);
+    const theme = resolveTheme(pref);
+    setResolved(theme);
+    applyThemeToDocument(theme);
     try {
-      localStorage.setItem(STORAGE_KEY, nextTheme);
-    } catch {
-      // Ignore storage errors (private mode, quota, etc.).
-    }
+      localStorage.setItem(STORAGE_KEY, pref);
+    } catch {}
   }, []);
 
   const toggleWhiteMode = useCallback((enabled: boolean) => {
-    setTheme(enabled ? 'light' : 'dark');
-  }, [setTheme]);
+    setPreference(enabled ? 'light' : 'dark');
+  }, [setPreference]);
 
   const value = useMemo<ThemeContextValue>(() => ({
-    theme,
-    isWhiteMode: theme === 'light',
-    setTheme,
+    preference,
+    theme: resolved,
+    isWhiteMode: resolved === 'light',
+    setPreference,
     toggleWhiteMode,
-  }), [theme, setTheme, toggleWhiteMode]);
+  }), [preference, resolved, setPreference, toggleWhiteMode]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
