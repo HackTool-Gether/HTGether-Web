@@ -10,6 +10,9 @@ interface ShellContextValue {
   /** Active project to expand sidebar sub-nav. Set by project pages on mount. */
   activeProject: { id: string; slug: string; findingsCount?: number; scopesCount?: number } | null;
   setActiveProject: (p: ShellContextValue['activeProject']) => void;
+  /** Increment to signal sidebar to reload projects */
+  projectsVersion: number;
+  refreshProjects: () => void;
 }
 
 const ShellContext = createContext<ShellContextValue | undefined>(undefined);
@@ -17,10 +20,12 @@ const ShellContext = createContext<ShellContextValue | undefined>(undefined);
 export function ShellProvider({ children }: { children: React.ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<ShellContextValue['activeProject']>(null);
+  const [projectsVersion, setProjectsVersion] = useState(0);
 
   const openPalette = useCallback(() => setPaletteOpen(true), []);
   const closePalette = useCallback(() => setPaletteOpen(false), []);
   const togglePalette = useCallback(() => setPaletteOpen((o) => !o), []);
+  const refreshProjects = useCallback(() => setProjectsVersion((v) => v + 1), []);
 
   // Global Cmd+K listener
   useEffect(() => {
@@ -36,7 +41,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ShellContext.Provider
-      value={{ paletteOpen, openPalette, closePalette, togglePalette, activeProject, setActiveProject }}
+      value={{ paletteOpen, openPalette, closePalette, togglePalette, activeProject, setActiveProject, projectsVersion, refreshProjects }}
     >
       {children}
     </ShellContext.Provider>

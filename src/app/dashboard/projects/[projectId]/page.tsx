@@ -411,25 +411,23 @@ export default function ProjectDetailPage() {
               {showAddScope && (
                 <form onSubmit={handleAddScope} className="px-4 pb-4">
                   <div className="grid grid-cols-2 gap-3 mb-3">
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Nom (ex: Application Web)"
                       value={scopeForm.name}
                       onChange={(e) => setScopeForm({ ...scopeForm, name: e.target.value })}
                       required
                     />
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Description (optionnelle)"
                       value={scopeForm.description}
                       onChange={(e) => setScopeForm({ ...scopeForm, description: e.target.value })}
                     />
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setShowAddScope(false)}>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddScope(false)}>
                       <X className="mr-1 h-3 w-3" /> Annuler
                     </Button>
-                    <Button size="sm" disabled={creating}>
+                    <Button type="submit" size="sm" disabled={creating}>
                       {creating && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                       Ajouter
                     </Button>

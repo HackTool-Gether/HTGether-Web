@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { projectsApi, scopesApi, type Project, type Scope } from '@/lib/api';
+import { useShell } from './shell-context';
 import { Avatar } from './avatar';
 import { HtgLogo } from '@/components/ui/htg-logo';
 
@@ -308,6 +309,7 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
   const pathname = usePathname() || '';
   const sidebarRouter = useRouter();
   const { user, token, logout } = useAuth();
+  const { projectsVersion } = useShell();
   const [projects, setProjects] = useState<Project[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -321,7 +323,7 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
     }
   }, [token]);
 
-  useEffect(() => { loadProjects(); }, [loadProjects]);
+  useEffect(() => { loadProjects(); }, [loadProjects, projectsVersion]);
 
   // Auto-expand the project whose page we're on
   useEffect(() => {

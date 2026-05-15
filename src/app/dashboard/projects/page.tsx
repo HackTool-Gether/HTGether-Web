@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AvatarStack } from '@/components/shell/avatar';
 import { useAuth } from '@/lib/auth-context';
+import { useShell } from '@/components/shell/shell-context';
 import { projectsApi, ApiError, type Project, type AuditType, type ProjectStatus } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +71,7 @@ function relativeTime(dateStr?: string): string {
 
 export default function ProjectsPage() {
   const { token } = useAuth();
+  const { refreshProjects } = useShell();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -119,6 +121,7 @@ export default function ProjectsPage() {
         name: '', clientCompany: '', clientNeed: '', context: '',
         startDate: '', endDate: '', auditType: 'WEB',
       });
+      refreshProjects();
       router.push(`/dashboard/projects/${project.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur lors de la création');
