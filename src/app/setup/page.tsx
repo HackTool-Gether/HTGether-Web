@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { setupApi, ApiError } from '@/lib/api';
 import type { OnboardingData } from '@/lib/api';
@@ -176,6 +176,8 @@ export default function SetupPage() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [adminCreated, setAdminCreated] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(true);
 
   const [admin, setAdmin] = useState({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '' });
   const [company, setCompany] = useState({ name: '', domain: '' });
@@ -191,6 +193,24 @@ export default function SetupPage() {
   const [smtp, setSmtp] = useState({ host: '', port: 587, user: '', password: '', fromEmail: '', fromName: '', secure: false });
   const [mailgun, setMailgun] = useState({ apiKey: '', domain: '', fromEmail: '', fromName: '' });
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Check if admin already exists — skip step 0 if so
+  useEffect(() => {
+    (async () => {
+      try {
+        const status = await setupApi.getStatus();
+        if (status.onboardingComplete) {
+          router.replace('/login');
+          return;
+        }
+        if (status.isSetup) {
+          setAdminCreated(true);
+          setStep(1);
+        }
+      } catch {}
+      setCheckingStatus(false);
+    })();
+  }, [router]);
 
   const callbackUrl = company.domain
     ? `https://${company.domain}/login`
@@ -226,11 +246,43 @@ export default function SetupPage() {
   };
 
   const goTo = (target: number) => {
-    if (target < step) { setError(''); setStep(target); }
+    if (target < step) {
+      if (target === 0 && adminCreated) return;
+      setError(''); setStep(target);
+    }
   };
 
-  const handleNext = () => { if (validateStep()) setStep((s) => Math.min(s + 1, STEPS.length - 1)); };
-  const handleBack = () => { setError(''); setStep((s) => Math.max(s - 1, 0)); };
+  const handleNext = async () => {
+    if (!validateStep()) return;
+
+    // Create admin immediately at step 1
+    if (currentStep.id === 'admin' && !adminCreated) {
+      setLoading(true);
+      setError('');
+      try {
+        await setupApi.init({
+          email: admin.email,
+          password: admin.password,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+        });
+        setAdminCreated(true);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Erreur lors de la création du compte');
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
+
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  };
+
+  const handleBack = () => {
+    setError('');
+    if (step === 1 && adminCreated) return;
+    setStep((s) => Math.max(s - 1, 0));
+  };
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -251,6 +303,14 @@ export default function SetupPage() {
       setLoading(false);
     }
   };
+
+  if (checkingStatus) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg)' }}>
+        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--fg-subtle)' }} />
+      </div>
+    );
+  }
 
   const toggleAuthProvider = (id: string) => {
     setAuthProviders((prev) => ({ ...prev, [id]: { ...prev[id], enabled: !prev[id].enabled } }));
@@ -322,7 +382,7 @@ export default function SetupPage() {
               title={s.title}
               desc={s.desc}
               active={i === step}
-              completed={i < step}
+              completed={i < step || (i === 0 && adminCreated)}
               isLast={i === STEPS.length - 1}
               onClick={() => goTo(i)}
             />

@@ -15,11 +15,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       if (isLoading) return;
 
       if (!user) {
-        // Check if setup is needed
         try {
           const { isSetup, onboardingComplete } = await setupApi.getStatus();
           if (!isSetup || !onboardingComplete) {
-            router.replace('/onboarding');
+            router.replace('/setup');
           } else {
             router.replace('/login');
           }
@@ -29,15 +28,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Force password change
       if (user.mustChangePassword) {
         router.replace('/change-password');
-        return;
-      }
-
-      // Onboarding not finished
-      if (!user.onboardingCompleted) {
-        router.replace('/onboarding');
         return;
       }
 
