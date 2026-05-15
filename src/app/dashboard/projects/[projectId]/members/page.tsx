@@ -51,12 +51,15 @@ export default function MembersPage() {
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const [proj, users] = await Promise.all([
-        projectsApi.getOne(projectId, token),
-        usersApi.getAll(token),
-      ]);
+      const proj = await projectsApi.getOne(projectId, token);
       setProject(proj);
-      setAllUsers(users);
+      // Load all users for invite (may fail for non-admins — that's fine)
+      try {
+        const users = await usersApi.getAll(token);
+        setAllUsers(users);
+      } catch {
+        // non-admin can't list users, invite section won't show
+      }
     } catch {
       setError('Impossible de charger les membres');
     } finally {
