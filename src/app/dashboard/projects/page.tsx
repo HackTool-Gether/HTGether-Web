@@ -214,7 +214,7 @@ export default function ProjectsPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Nom du projet</Label>
+                  <Label>Nom du projet <span className="text-destructive">*</span></Label>
                   <Input
                     placeholder="acme-prod-2026"
                     value={form.name}
@@ -223,7 +223,7 @@ export default function ProjectsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Client</Label>
+                  <Label>Client <span className="text-destructive">*</span></Label>
                   <Input
                     placeholder="ACME Corp"
                     value={form.clientCompany}
@@ -233,7 +233,7 @@ export default function ProjectsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Besoin client</Label>
+                <Label>Besoin client <span className="text-destructive">*</span></Label>
                 <textarea
                   placeholder="Test d'intrusion de l'application web…"
                   value={form.clientNeed}
@@ -244,7 +244,7 @@ export default function ProjectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contexte</Label>
+                <Label>Contexte <span className="text-destructive">*</span></Label>
                 <textarea
                   placeholder="Application e-commerce en production…"
                   value={form.context}
@@ -256,7 +256,7 @@ export default function ProjectsPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Début</Label>
+                  <Label>Début <span className="text-destructive">*</span></Label>
                   <Input
                     type="date"
                     value={form.startDate}
@@ -265,7 +265,7 @@ export default function ProjectsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Fin</Label>
+                  <Label>Fin <span className="text-destructive">*</span></Label>
                   <Input
                     type="date"
                     value={form.endDate}
@@ -274,7 +274,7 @@ export default function ProjectsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Type d&apos;audit</Label>
+                  <Label>Type d&apos;audit <span className="text-destructive">*</span></Label>
                   <Select
                     value={form.auditType}
                     onValueChange={(v) => setForm({ ...form, auditType: v as AuditType })}
