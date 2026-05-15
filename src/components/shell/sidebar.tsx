@@ -306,6 +306,7 @@ interface SidebarProps {
 
 export function Sidebar({ onOpenPalette }: SidebarProps) {
   const pathname = usePathname() || '';
+  const sidebarRouter = useRouter();
   const { user, token, logout } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -470,29 +471,51 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
           gap: 10,
         }}
       >
-        {user && (
-          <Avatar
-            user={{
-              id: user.id,
-              name: `${user.firstName} ${user.lastName}`,
-            }}
-          />
-        )}
-        <div style={{ flex: 1, lineHeight: 1.2, minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 500 }}>
-            {user ? `${user.firstName} ${user.lastName}` : '—'}
-          </div>
-          <div
-            className="mono"
-            style={{
-              fontSize: 10.5,
-              color: 'var(--fg-subtle)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {user?.email}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flex: 1,
+            minWidth: 0,
+            cursor: 'pointer',
+            borderRadius: 6,
+            padding: '4px 6px',
+            margin: '-4px -6px',
+            transition: 'background 0.15s',
+          }}
+          onClick={() => sidebarRouter.push('/dashboard/profile')}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          title="Mon profil"
+        >
+          {user && (
+            <Avatar
+              user={{
+                id: user.id,
+                name: `${user.firstName} ${user.lastName}`,
+                avatarStyle: user.avatarStyle,
+                avatarSeed: user.avatarSeed,
+                avatarOptions: user.avatarOptions,
+              }}
+            />
+          )}
+          <div style={{ flex: 1, lineHeight: 1.2, minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 500 }}>
+              {user ? `${user.firstName} ${user.lastName}` : '—'}
+            </div>
+            <div
+              className="mono"
+              style={{
+                fontSize: 10.5,
+                color: 'var(--fg-subtle)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {user?.email}
+            </div>
           </div>
         </div>
         <button

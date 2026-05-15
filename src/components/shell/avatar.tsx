@@ -1,5 +1,8 @@
 'use client';
 
+import { useMemo } from 'react';
+import { generateAvatarSvg } from '@/lib/dicebear';
+
 const PRESENCE_COLORS = [
   'var(--pr-1)',
   'var(--pr-2)',
@@ -13,11 +16,13 @@ export interface PresenceUser {
   name: string;
   initials?: string;
   color?: string;
+  avatarStyle?: string;
+  avatarSeed?: string;
+  avatarOptions?: Record<string, any>;
 }
 
 function colorFor(user: PresenceUser): string {
   if (user.color) return user.color;
-  // Stable hash → palette index
   let h = 0;
   for (let i = 0; i < user.id.length; i++) h = (h * 31 + user.id.charCodeAt(i)) >>> 0;
   return PRESENCE_COLORS[h % PRESENCE_COLORS.length];
@@ -37,6 +42,22 @@ interface AvatarProps {
 }
 
 export function Avatar({ user, size = 'sm', title }: AvatarProps) {
+  const svg = useMemo(() => {
+    if (!user.avatarStyle || !user.avatarSeed) return null;
+    return generateAvatarSvg(user.avatarStyle, user.avatarSeed, user.avatarOptions || {});
+  }, [user.avatarStyle, user.avatarSeed, user.avatarOptions]);
+
+  if (svg) {
+    return (
+      <span
+        className={`avatar ${size === 'lg' ? 'avatar-lg' : ''}`}
+        title={title || user.name}
+        dangerouslySetInnerHTML={{ __html: svg }}
+        style={{ padding: 0, overflow: 'hidden', background: 'var(--bg-elevated)' }}
+      />
+    );
+  }
+
   return (
     <span
       className={`avatar ${size === 'lg' ? 'avatar-lg' : ''}`}

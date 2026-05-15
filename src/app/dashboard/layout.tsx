@@ -29,6 +29,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           display: 'flex',
           flexDirection: 'column',
           minWidth: 0,
+          overflow: 'auto',
           background: 'var(--bg)',
         }}
       >

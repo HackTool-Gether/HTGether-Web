@@ -28,7 +28,9 @@ import {
   EyeOff,
   Shield,
   UserIcon,
+  ChevronRight,
 } from 'lucide-react';
+import { generateAvatarSvg } from '@/lib/dicebear';
 
 export default function UsersPage() {
   const { user: currentUser, token } = useAuth();
@@ -262,16 +264,27 @@ export default function UsersPage() {
       {/* Users list */}
       <div className="space-y-2">
         {users.map((u) => (
-          <Card key={u.id}>
+          <Card
+            key={u.id}
+            className="cursor-pointer transition-colors hover:bg-muted/30"
+            onClick={() => router.push(`/dashboard/users/${u.id}`)}
+          >
             <CardContent className="flex items-center justify-between py-4">
               <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  {u.role === 'SUPER_ADMIN' ? (
-                    <Shield className="h-5 w-5 text-primary" />
-                  ) : (
-                    <UserIcon className="h-5 w-5 text-primary" />
-                  )}
-                </div>
+                {u.avatarStyle && u.avatarSeed ? (
+                  <div
+                    className="h-10 w-10 rounded-full overflow-hidden bg-secondary shrink-0"
+                    dangerouslySetInnerHTML={{ __html: generateAvatarSvg(u.avatarStyle, u.avatarSeed, u.avatarOptions || {}) }}
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                    {u.role === 'SUPER_ADMIN' ? (
+                      <Shield className="h-5 w-5 text-primary" />
+                    ) : (
+                      <UserIcon className="h-5 w-5 text-primary" />
+                    )}
+                  </div>
+                )}
                 <div>
                   <p className="font-medium text-sm">
                     {u.firstName} {u.lastName}
@@ -301,11 +314,12 @@ export default function UsersPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleToggleActive(u.id)}
+                    onClick={(e) => { e.stopPropagation(); handleToggleActive(u.id); }}
                   >
                     {u.isActive ? 'Désactiver' : 'Activer'}
                   </Button>
                 )}
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>

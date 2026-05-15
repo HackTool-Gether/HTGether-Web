@@ -124,6 +124,13 @@ export const authApi = {
       body: JSON.stringify(data),
       token,
     }),
+
+  updateAvatar: (data: { avatarStyle: string; avatarSeed: string; avatarOptions?: Record<string, any> }, token: string) =>
+    apiRequest<{ id: string; avatarStyle: string; avatarSeed: string; avatarOptions: Record<string, any> }>('/auth/avatar', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      token,
+    }),
 };
 
 // Setup API
@@ -181,6 +188,19 @@ export const usersApi = {
   toggleActive: (id: string, token: string) =>
     apiRequest<User>(`/users/${id}/toggle-active`, {
       method: 'PATCH',
+      token,
+    }),
+
+  update: (id: string, data: Partial<{ firstName: string; lastName: string; email: string; role: string; platformPermissions: Record<string, boolean> }>, token: string) =>
+    apiRequest<UserDetail>(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  resetPassword: (id: string, token: string) =>
+    apiRequest<{ generatedPassword: string }>(`/users/${id}/reset-password`, {
+      method: 'POST',
       token,
     }),
 };
@@ -527,7 +547,18 @@ export interface User {
   mustChangePassword?: boolean;
   onboardingCompleted?: boolean;
   onboardingStep?: number;
+  platformPermissions?: Record<string, boolean>;
+  avatarStyle?: string;
+  avatarSeed?: string;
+  avatarOptions?: Record<string, any>;
   createdAt?: string;
+}
+
+export interface UserDetail extends User {
+  projectMembers?: {
+    role: string;
+    project: { id: string; name: string; clientCompany: string; status: string };
+  }[];
 }
 
 export interface LoginResponse {
