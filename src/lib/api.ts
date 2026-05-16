@@ -486,6 +486,56 @@ export const conversationsApi = {
     ),
 };
 
+// Invitations API
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
+
+export interface Invitation {
+  id: string;
+  role: ProjectRole;
+  status: InvitationStatus;
+  createdAt: string;
+  updatedAt: string;
+  projectId: string;
+  userId: string;
+  invitedById: string;
+  user?: { id: string; firstName: string; lastName: string; email: string };
+  project?: { id: string; name: string; clientCompany?: string };
+  invitedBy?: { id: string; firstName: string; lastName: string };
+}
+
+export const invitationsApi = {
+  invite: (projectId: string, data: { userId: string; role: ProjectRole }, token: string) =>
+    apiRequest<Invitation>(`/projects/${projectId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getByProject: (projectId: string, token: string) =>
+    apiRequest<Invitation[]>(`/projects/${projectId}/invitations`, { token }),
+
+  getMine: (token: string) =>
+    apiRequest<Invitation[]>('/invitations/mine', { token }),
+
+  accept: (id: string, token: string) =>
+    apiRequest<{ message: string }>(`/invitations/${id}/accept`, {
+      method: 'POST',
+      token,
+    }),
+
+  decline: (id: string, token: string) =>
+    apiRequest<{ message: string }>(`/invitations/${id}/decline`, {
+      method: 'POST',
+      token,
+    }),
+
+  cancel: (id: string, token: string) =>
+    apiRequest<{ message: string }>(`/invitations/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
 // Reports API
 export interface Report {
   id: string;

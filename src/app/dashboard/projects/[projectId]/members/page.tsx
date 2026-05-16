@@ -16,14 +16,16 @@ import {
 import {
   projectsApi,
   usersApi,
+  invitationsApi,
   ApiError,
   type ProjectDetail,
   type ProjectMember,
   type ProjectRole,
   type User,
+  type Invitation,
 } from '@/lib/api';
 import { PermissionMatrix } from '@/components/permissions/permission-matrix';
-import { ArrowLeft, Loader2, UserPlus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, UserPlus, Trash2, Clock, X } from 'lucide-react';
 
 const ROLE_LABELS: Record<ProjectRole, string> = {
   MANAGER: 'Manager',
@@ -40,6 +42,7 @@ export default function MembersPage() {
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -53,6 +56,13 @@ export default function MembersPage() {
     try {
       const proj = await projectsApi.getOne(projectId, token);
       setProject(proj);
+      // Load pending invitations for this project
+      try {
+        const invitations = await invitationsApi.getByProject(projectId, token);
+        setPendingInvitations(invitations);
+      } catch {
+        // may fail if not a member
+      }
       // Load all users for invite (may fail for non-admins — that's fine)
       try {
         const users = await usersApi.getAll(token);
@@ -86,7 +96,9 @@ export default function MembersPage() {
     currentMember?.role === 'MANAGER' || currentUser?.role === 'SUPER_ADMIN';
 
   const availableUsers = allUsers.filter(
-    (u) => !members.some((m) => m.user.id === u.id),
+    (u) =>
+      !members.some((m) => m.user.id === u.id) &&
+      !pendingInvitations.some((inv) => inv.userId === u.id),
   );
 
   const handleInvite = async () => {
@@ -94,15 +106,25 @@ export default function MembersPage() {
     setInviting(true);
     setError('');
     try {
-      await projectsApi.addMember(projectId, { userId: inviteUserId, role: inviteRole }, token);
+      await invitationsApi.invite(projectId, { userId: inviteUserId, role: inviteRole }, token);
       setInviteUserId('');
       setInviteRole('PENTESTER');
-      const proj = await projectsApi.getOne(projectId, token);
-      setProject(proj);
+      await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur');
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    if (!token) return;
+    setError('');
+    try {
+      await invitationsApi.cancel(invitationId, token);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
     }
   };
 
@@ -210,6 +232,55 @@ export default function MembersPage() {
                 )}
                 Inviter
               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Pending invitations */}
+        {isManager && pendingInvitations.length > 0 && (
+          <div className="rounded-xl bg-card p-4">
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              Invitations en attente
+              <span className="text-xs font-normal text-muted-foreground font-mono">
+                {pendingInvitations.length}
+              </span>
+            </h3>
+            <div className="space-y-2">
+              {pendingInvitations.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-muted/50"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Avatar
+                      user={{ id: inv.user?.id || '', name: `${inv.user?.firstName || ''} ${inv.user?.lastName || ''}` }}
+                    />
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium truncate block">
+                        {inv.user?.firstName} {inv.user?.lastName}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate block">
+                        {inv.user?.email}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">
+                      {ROLE_LABELS[inv.role]}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleCancelInvitation(inv.id)}
+                      title="Annuler l'invitation"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

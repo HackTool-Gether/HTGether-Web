@@ -10,10 +10,11 @@ import {
   Search,
   LogOut,
   ChevronRight,
+  Mail,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { projectsApi, scopesApi, type Project, type Scope } from '@/lib/api';
+import { projectsApi, scopesApi, invitationsApi, type Project, type Scope } from '@/lib/api';
 import { useShell } from './shell-context';
 import { Avatar } from './avatar';
 import { HtgLogo } from '@/components/ui/htg-logo';
@@ -67,7 +68,24 @@ function SidebarItem({ icon: Icon, label, href, active, badge, onClick }: Sideba
         {label}
       </span>
       {badge !== undefined && (
-        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>{badge}</span>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10,
+            color: 'white',
+            background: 'var(--accent)',
+            borderRadius: 'var(--r-full)',
+            minWidth: 18,
+            height: 18,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 5px',
+            fontWeight: 600,
+          }}
+        >
+          {badge}
+        </span>
       )}
     </button>
   );
@@ -312,6 +330,7 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
   const { projectsVersion } = useShell();
   const [projects, setProjects] = useState<Project[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [invitationCount, setInvitationCount] = useState(0);
 
   const loadProjects = useCallback(async () => {
     if (!token) return;
@@ -323,7 +342,18 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
     }
   }, [token]);
 
+  const loadInvitations = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await invitationsApi.getMine(token);
+      setInvitationCount(data.length);
+    } catch {
+      // silently fail
+    }
+  }, [token]);
+
   useEffect(() => { loadProjects(); }, [loadProjects, projectsVersion]);
+  useEffect(() => { loadInvitations(); }, [loadInvitations, projectsVersion]);
 
   // Auto-expand the project whose page we're on
   useEffect(() => {
@@ -424,6 +454,13 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
           label="Projets"
           href="/dashboard/projects"
           active={pathname === '/dashboard/projects'}
+        />
+        <SidebarItem
+          icon={Mail}
+          label="Invitations"
+          href="/dashboard/invitations"
+          active={pathname === '/dashboard/invitations'}
+          badge={invitationCount > 0 ? invitationCount : undefined}
         />
 
         {activeProjects.length > 0 && (
