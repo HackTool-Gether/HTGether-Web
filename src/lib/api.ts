@@ -1069,9 +1069,11 @@ export interface WorkloadData {
 
 export interface DashboardStats {
   projects: { total: number; active: number };
-  findings: { open: number; bySeverity: Record<string, number> };
+  findings: { open: number; bySeverity: Record<string, number>; mine?: number | null };
   tasks: { total: number; done: number; inProgress: number };
+  myTasks?: { total: number; done: number; inProgress: number } | null;
   users: { active: number };
+  team?: number | null;
   recentFindings: {
     id: string; title: string; severity: string;
     projectName: string; projectId: string;
@@ -1082,6 +1084,11 @@ export interface DashboardStats {
     projectName: string; projectId: string;
     assigneeName: string | null; completedAt: string;
   }[];
+  activeTasks?: {
+    id: string; title: string; status: string; priority: string;
+    dueDate: string | null;
+    projectName: string; projectId: string;
+  }[] | null;
 }
 
 export const dashboardApi = {

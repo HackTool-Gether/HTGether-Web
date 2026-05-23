@@ -18,6 +18,8 @@ import {
   FileText,
   Loader2,
   CheckCircle2,
+  LayoutGrid,
+  Clock,
 } from 'lucide-react';
 
 const SEV_COLORS: Record<string, string> = {
@@ -105,6 +107,7 @@ export default function DashboardPage() {
           projects={projects || []}
           stats={stats}
           loading={loading}
+          isAdmin={user?.role === 'SUPER_ADMIN'}
           onOpen={(id) => router.push(`/dashboard/projects/${id}`)}
           onNew={() => router.push('/dashboard/projects?new=1')}
           onAllProjects={() => router.push('/dashboard/projects')}
@@ -216,6 +219,7 @@ interface DashboardActiveProps {
   projects: Project[];
   stats: DashboardStats | null;
   loading: boolean;
+  isAdmin?: boolean;
   onOpen: (id: string) => void;
   onNew: () => void;
   onAllProjects: () => void;
@@ -227,6 +231,7 @@ function DashboardActive({
   projects,
   stats,
   loading,
+  isAdmin,
   onOpen,
   onNew,
   onAllProjects,
@@ -254,30 +259,51 @@ function DashboardActive({
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard
-          label="Projets actifs"
-          value={stats ? String(stats.projects.active) : '—'}
-          hint={stats ? `${stats.projects.total} au total` : ''}
+          label={isAdmin ? 'Projets actifs' : 'Mes projets'}
+          value={stats ? String(isAdmin ? stats.projects.active : stats.projects.total) : '—'}
+          hint={stats ? (isAdmin ? `${stats.projects.total} au total` : `${stats.projects.active} en cours`) : ''}
           icon={<Folder className="h-3.5 w-3.5" />}
         />
         <StatCard
-          label="Findings ouvertes"
+          label={isAdmin ? 'Findings ouvertes' : 'Findings'}
           value={stats ? String(stats.findings.open) : '—'}
-          hint={stats ? `${stats.findings.bySeverity.CRITICAL || 0} critiques` : ''}
+          hint={stats ? (
+            isAdmin
+              ? `${stats.findings.bySeverity.CRITICAL || 0} critiques`
+              : `${stats.findings.mine ?? 0} par moi · ${stats.findings.bySeverity.CRITICAL || 0} critiques`
+          ) : ''}
           icon={<Bug className="h-3.5 w-3.5" />}
           hintColor={stats && stats.findings.bySeverity.CRITICAL > 0 ? SEV_COLORS.CRITICAL : undefined}
         />
         <StatCard
-          label="Tâches"
-          value={stats ? `${stats.tasks.done}/${stats.tasks.total}` : '—'}
-          hint={stats ? `${stats.tasks.inProgress} en cours` : ''}
+          label={isAdmin ? 'Tâches' : 'Mes tâches'}
+          value={stats ? (
+            isAdmin
+              ? `${stats.tasks.done}/${stats.tasks.total}`
+              : `${stats.myTasks?.done ?? 0}/${stats.myTasks?.total ?? 0}`
+          ) : '—'}
+          hint={stats ? (
+            isAdmin
+              ? `${stats.tasks.inProgress} en cours`
+              : `${stats.myTasks?.inProgress ?? 0} en cours`
+          ) : ''}
           icon={<ListChecks className="h-3.5 w-3.5" />}
         />
-        <StatCard
-          label="Utilisateurs actifs"
-          value={stats ? String(stats.users.active) : '—'}
-          hint="sur la plateforme"
-          icon={<Users className="h-3.5 w-3.5" />}
-        />
+        {isAdmin ? (
+          <StatCard
+            label="Utilisateurs actifs"
+            value={stats ? String(stats.users.active) : '—'}
+            hint="sur la plateforme"
+            icon={<Users className="h-3.5 w-3.5" />}
+          />
+        ) : (
+          <StatCard
+            label="Équipe"
+            value={stats ? String(stats.team ?? 0) : '—'}
+            hint="collaborateurs"
+            icon={<Users className="h-3.5 w-3.5" />}
+          />
+        )}
       </div>
 
       {/* Findings by severity bar */}
@@ -375,10 +401,75 @@ function DashboardActive({
 
         {/* Activity feed */}
         <div className="flex flex-col gap-4">
+          {/* Active tasks — non-admin only */}
+          {!isAdmin && (
+            <div className="rounded-xl bg-card">
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm font-medium">Mes tâches en cours</span>
+                <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="px-4 pb-3">
+                {!stats || !stats.activeTasks || stats.activeTasks.length === 0 ? (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-2">
+                    <Activity className="h-3.5 w-3.5" />
+                    Aucune tâche active.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {stats.activeTasks.map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 rounded-lg p-1.5 -mx-1.5 transition-colors"
+                        onClick={() => router.push(`/dashboard/projects/${t.projectId}/tasks`)}
+                      >
+                        <TaskStatusDot status={t.status} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium truncate">{t.title}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {t.projectName}
+                            {t.dueDate && ` · ${new Date(t.dueDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}
+                          </div>
+                        </div>
+                        <PriorityBadge priority={t.priority} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Kanban shortcuts per project */}
+              {stats?.activeTasks && stats.activeTasks.length > 0 && (() => {
+                const projectMap = new Map<string, { id: string; name: string; count: number }>();
+                for (const t of stats.activeTasks) {
+                  const existing = projectMap.get(t.projectId);
+                  if (existing) { existing.count++; } else {
+                    projectMap.set(t.projectId, { id: t.projectId, name: t.projectName, count: 1 });
+                  }
+                }
+                return (
+                  <div className="border-t border-border px-4 py-2.5 flex flex-wrap gap-2">
+                    {[...projectMap.values()].map((p) => (
+                      <Button
+                        key={p.id}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5"
+                        onClick={() => router.push(`/dashboard/projects/${p.id}/tasks`)}
+                      >
+                        <LayoutGrid className="h-3 w-3" />
+                        {p.name}
+                        <span className="text-muted-foreground font-mono">({p.count})</span>
+                      </Button>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Recent findings */}
           <div className="rounded-xl bg-card">
             <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm font-medium">Derniers findings</span>
+              <span className="text-sm font-medium">{isAdmin ? 'Derniers findings' : 'Mes derniers findings'}</span>
               <Bug className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
             <div className="px-4 pb-3">
@@ -420,7 +511,7 @@ function DashboardActive({
           {/* Recent completed tasks */}
           <div className="rounded-xl bg-card">
             <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm font-medium">Tâches complétées</span>
+              <span className="text-sm font-medium">{isAdmin ? 'Tâches complétées' : 'Mes tâches complétées'}</span>
               <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
             <div className="px-4 pb-3">
@@ -455,6 +546,48 @@ function DashboardActive({
         </div>
       </div>
     </div>
+  );
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  BACKLOG: 'oklch(0.55 0.02 250)',
+  TODO: 'oklch(0.6 0.15 250)',
+  IN_PROGRESS: 'oklch(0.65 0.18 55)',
+};
+
+const PRIORITY_LABELS: Record<string, { text: string; color: string }> = {
+  CRITICAL: { text: 'C', color: SEV_COLORS.CRITICAL },
+  HIGH: { text: 'H', color: SEV_COLORS.HIGH },
+  MEDIUM: { text: 'M', color: SEV_COLORS.MEDIUM },
+  LOW: { text: 'B', color: SEV_COLORS.LOW },
+};
+
+function TaskStatusDot({ status }: { status: string }) {
+  const color = STATUS_COLORS[status] || 'gray';
+  const isInProgress = status === 'IN_PROGRESS';
+  return (
+    <span className="relative flex h-2.5 w-2.5 shrink-0">
+      {isInProgress && (
+        <span className="absolute inset-0 rounded-full animate-ping opacity-40" style={{ background: color }} />
+      )}
+      <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const p = PRIORITY_LABELS[priority];
+  if (!p) return null;
+  return (
+    <span
+      className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0"
+      style={{
+        background: `color-mix(in oklch, ${p.color} 15%, transparent)`,
+        color: p.color,
+      }}
+    >
+      {p.text}
+    </span>
   );
 }
 
