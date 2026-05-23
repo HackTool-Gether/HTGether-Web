@@ -11,6 +11,7 @@ import {
   LogOut,
   ChevronRight,
   Mail,
+  FileText,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
@@ -461,6 +462,12 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
           href="/dashboard/invitations"
           active={pathname === '/dashboard/invitations'}
           badge={invitationCount > 0 ? invitationCount : undefined}
+        />
+        <SidebarItem
+          icon={FileText}
+          label="Templates"
+          href="/dashboard/templates"
+          active={pathname.startsWith('/dashboard/templates')}
         />
 
         {activeProjects.length > 0 && (
