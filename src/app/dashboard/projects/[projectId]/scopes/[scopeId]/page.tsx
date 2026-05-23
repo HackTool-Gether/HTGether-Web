@@ -54,12 +54,14 @@ export default function ScopeDetailPage() {
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const [data, comps] = await Promise.all([
-        scopesApi.getOne(projectId, scopeId, token),
-        componentsApi.getAllByScope(scopeId, token),
-      ]);
+      const data = await scopesApi.getOne(projectId, scopeId, token);
       setScope(data);
-      setComponents(comps);
+      try {
+        const comps = await componentsApi.getAllByScope(scopeId, token);
+        setComponents(comps);
+      } catch {
+        setComponents([]);
+      }
     } catch {
       setError('Impossible de charger le scope');
     } finally {
