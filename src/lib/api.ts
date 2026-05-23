@@ -220,7 +220,7 @@ export const projectsApi = {
       token,
     }),
 
-  update: (id: string, data: Partial<CreateProjectData & { status: string }>, token: string) =>
+  update: (id: string, data: Partial<CreateProjectData & { status: string; templateId: string | null }>, token: string) =>
     apiRequest<Project>(`/projects/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -773,6 +773,7 @@ export interface Project {
   endDate: string;
   status: ProjectStatus;
   auditType: AuditType;
+  templateId?: string | null;
   members: ProjectMember[];
   _count?: { scopes: number; tasks?: number };
   createdAt: string;

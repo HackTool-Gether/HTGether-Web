@@ -8,10 +8,12 @@ import {
   reportsApi,
   projectsApi,
   findingsApi,
+  templatesApi,
   ApiError,
   type ProjectDetail,
   type Finding,
   type Report,
+  type ReportTemplate,
   type Severity,
   type FindingStatus,
 } from '@/lib/api';
@@ -36,6 +38,10 @@ import {
   FileText,
   ShieldAlert,
   Save,
+  Download,
+  Eye,
+  ChevronDown,
+  X,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -640,8 +646,27 @@ export default function ProjectReportPage() {
   const [error, setError] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
+  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [showTemplateSelect, setShowTemplateSelect] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfPreviewHtml, setPdfPreviewHtml] = useState('');
+  const [pdfLoading, setPdfLoading] = useState(false);
+
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const findingSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const templateSelectRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showTemplateSelect) return;
+    const handleClick = (e: MouseEvent) => {
+      if (templateSelectRef.current && !templateSelectRef.current.contains(e.target as Node)) {
+        setShowTemplateSelect(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showTemplateSelect]);
 
   const extraExtensions = useMemo(() => [VariableNode, FindingsTableNode], []);
   const extraSlashItems = useMemo(() => buildReportSlashItems(), []);
@@ -653,15 +678,18 @@ export default function ProjectReportPage() {
     let mounted = true;
     (async () => {
       try {
-        const [proj, fdg, rep] = await Promise.all([
+        const [proj, fdg, rep, tpls] = await Promise.all([
           projectsApi.getOne(projectId, token),
           findingsApi.getAllByProject(projectId, token),
           reportsApi.get(projectId, token),
+          templatesApi.getAll(token),
         ]);
         if (!mounted) return;
         setProject(proj);
         setFindings(fdg);
         setReport(rep);
+        setTemplates(tpls);
+        setSelectedTemplateId(proj.templateId || null);
 
         const data = migrateContent(
           rep.content && typeof rep.content === 'object' ? rep.content : null,
@@ -820,6 +848,50 @@ export default function ProjectReportPage() {
     }
   }, [findings, scheduleSaveReport]);
 
+  // ── Template assignment ──
+
+  const assignTemplate = useCallback(
+    async (templateId: string | null) => {
+      if (!token) return;
+      setSelectedTemplateId(templateId);
+      setShowTemplateSelect(false);
+      try {
+        await projectsApi.update(projectId, { templateId }, token);
+      } catch {
+        setError('Erreur lors de l\'assignation du template');
+      }
+    },
+    [token, projectId],
+  );
+
+  // ── PDF preview + export ──
+
+  const loadPdfPreview = useCallback(async () => {
+    if (!token || !selectedTemplateId) return;
+    setPdfLoading(true);
+    try {
+      const result = await templatesApi.render(selectedTemplateId, projectId, token);
+      const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${result.css}</style></head><body>${result.html}</body></html>`;
+      setPdfPreviewHtml(fullHtml);
+      setShowPdfPreview(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur lors du rendu');
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [token, selectedTemplateId, projectId]);
+
+  const exportPdf = useCallback(() => {
+    if (!pdfPreviewHtml) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(pdfPreviewHtml);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      setTimeout(() => printWindow.print(), 300);
+    };
+  }, [pdfPreviewHtml]);
+
   // ── Derived data for sidebar ──
 
   const sidebarSections: SidebarSection[] = useMemo(
@@ -893,6 +965,90 @@ export default function ProjectReportPage() {
             <span className="font-mono text-[11px] text-muted-foreground">
               {sections.length} section{sections.length !== 1 ? 's' : ''} · {findings.length} finding{findings.length !== 1 ? 's' : ''}
             </span>
+
+            <div className="h-4 w-px bg-border" />
+
+            {/* Template selector */}
+            <div className="relative" ref={templateSelectRef}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setShowTemplateSelect(!showTemplateSelect)}
+              >
+                <FileText className="h-3 w-3" />
+                {selectedTemplateId
+                  ? templates.find((t) => t.id === selectedTemplateId)?.name || 'Template'
+                  : 'Choisir un template'}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+              {showTemplateSelect && (
+                <div
+                  className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg border border-border bg-popover shadow-md py-1"
+                >
+                  {templates.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">Aucun template disponible</div>
+                  ) : (
+                    templates.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => assignTemplate(t.id)}
+                        className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-accent/10 transition-colors text-left ${
+                          selectedTemplateId === t.id ? 'text-accent font-medium' : 'text-foreground'
+                        }`}
+                      >
+                        <FileText className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate flex-1">{t.name}</span>
+                        {t.isDefault && (
+                          <span className="text-[9px] text-muted-foreground bg-muted px-1 py-0.5 rounded">défaut</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                  {selectedTemplateId && (
+                    <>
+                      <div className="h-px bg-border my-1" />
+                      <button
+                        onClick={() => assignTemplate(null)}
+                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent/10"
+                      >
+                        <X className="h-3 w-3" />
+                        Retirer le template
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* PDF actions */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={loadPdfPreview}
+              disabled={!selectedTemplateId || pdfLoading}
+            >
+              {pdfLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
+              Aperçu PDF
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => {
+                if (pdfPreviewHtml) {
+                  exportPdf();
+                } else if (selectedTemplateId) {
+                  loadPdfPreview().then(() => {
+                    setTimeout(exportPdf, 500);
+                  });
+                }
+              }}
+              disabled={!selectedTemplateId || pdfLoading}
+            >
+              <Download className="h-3 w-3" />
+              Exporter PDF
+            </Button>
           </div>
         </div>
 
@@ -962,6 +1118,53 @@ export default function ProjectReportPage() {
             )}
           </div>
         </div>
+
+        {/* PDF Preview modal */}
+        {showPdfPreview && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.6)' }}
+            onClick={() => setShowPdfPreview(false)}
+          >
+            <div
+              className="bg-card rounded-xl border border-border shadow-2xl flex flex-col"
+              style={{ width: '80vw', height: '85vh', maxWidth: 1000 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Aperçu du rapport</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({templates.find((t) => t.id === selectedTemplateId)?.name})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={exportPdf}>
+                    <Download className="h-3 w-3" />
+                    Imprimer / PDF
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setShowPdfPreview(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto bg-white rounded-b-xl">
+                <iframe
+                  srcDoc={pdfPreviewHtml}
+                  className="w-full h-full border-0"
+                  sandbox="allow-same-origin"
+                  title="Aperçu PDF"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ReportProvider>
   );
