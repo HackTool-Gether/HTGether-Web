@@ -180,6 +180,15 @@ function tiptapToText(node: any): string {
   }
 }
 
+function toText(v: any): string {
+  if (!v) return '';
+  if (typeof v === 'object') return tiptapToText(v).trim();
+  if (typeof v === 'string' && v.startsWith('{"type":"doc"')) {
+    try { return tiptapToText(JSON.parse(v)).trim(); } catch { return v; }
+  }
+  return v;
+}
+
 function findingToMarkdown(f: Finding): string {
   const parts = [
     `## ${f.title}`,
@@ -187,11 +196,11 @@ function findingToMarkdown(f: Finding): string {
     `**Statut :** ${STATUS_LABEL[f.status] || f.status}`,
     f.slug ? `**Réf :** ${f.slug}` : '',
     '',
-    f.description ? `### Description\n${f.description}` : '',
-    f.proof ? `### Preuve\n${f.proof}` : '',
-    f.impact ? `### Impact\n${f.impact}` : '',
-    f.remediation ? `### Remédiation\n${f.remediation}` : '',
-    f.references ? `### Références\n${f.references}` : '',
+    f.description ? `### Description\n${toText(f.description)}` : '',
+    f.proof ? `### Preuve\n${toText(f.proof)}` : '',
+    f.impact ? `### Impact\n${toText(f.impact)}` : '',
+    f.remediation ? `### Remédiation\n${toText(f.remediation)}` : '',
+    f.references ? `### Références\n${toText(f.references)}` : '',
   ];
   return parts.filter(Boolean).join('\n');
 }
@@ -347,15 +356,23 @@ function FindingMeta({
 
 function FindingField({
   label,
-  value,
+  value: rawValue,
   onChange,
   placeholder,
 }: {
   label: string;
-  value: string;
+  value: any;
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
+  const value = useMemo(() => {
+    if (!rawValue) return '';
+    if (typeof rawValue === 'object') return tiptapToText(rawValue).trim();
+    if (typeof rawValue === 'string' && rawValue.startsWith('{"type":"doc"')) {
+      try { return tiptapToText(JSON.parse(rawValue)).trim(); } catch { return rawValue; }
+    }
+    return rawValue;
+  }, [rawValue]);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const autoResize = useCallback(() => {
