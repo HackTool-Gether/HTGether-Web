@@ -5,7 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { Avatar } from '@/components/shell/avatar';
 import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
-import { projectsApi, scopesApi, ApiError, type ProjectDetail, type Scope, type ScopeStatus, type AuditType, type ProjectStatus } from '@/lib/api';
+import {
+  projectsApi, scopesApi, statsApi, remarksApi, ApiError,
+  type ProjectDetail, type ProjectStats, type ProjectRemark,
+  type Scope, type ScopeStatus, type AuditType, type ProjectStatus,
+} from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +29,12 @@ import {
   Trash2,
   Pencil,
   Check,
+  AlertTriangle,
+  Clock,
+  Bug,
+  ListChecks,
+  Send,
+  MessageSquare,
 } from 'lucide-react';
 
 const AUDIT_LABELS: Record<string, string> = {
@@ -69,6 +79,14 @@ const STATUS_PHASE: Record<string, string> = {
   ARCHIVED: 'Archivé',
 };
 
+const SEV_COLORS: Record<string, string> = {
+  CRITICAL: 'var(--sev-critical-fg, oklch(0.65 0.2 25))',
+  HIGH: 'var(--sev-high-fg, oklch(0.7 0.15 40))',
+  MEDIUM: 'var(--sev-medium-fg, oklch(0.75 0.15 80))',
+  LOW: 'var(--sev-low-fg, oklch(0.6 0.12 250))',
+  INFO: 'var(--sev-info-fg, oklch(0.6 0.05 250))',
+};
+
 function progressPercent(p: ProjectDetail): number {
   const start = new Date(p.startDate).getTime();
   const end = new Date(p.endDate).getTime();
@@ -100,6 +118,8 @@ export default function ProjectDetailPage() {
   const { setActiveProject } = useShell();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [stats, setStats] = useState<ProjectStats | null>(null);
+  const [remarks, setRemarks] = useState<ProjectRemark[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddScope, setShowAddScope] = useState(false);
@@ -111,6 +131,13 @@ export default function ProjectDetailPage() {
     name: '', clientCompany: '', clientNeed: '', context: '',
     startDate: '', endDate: '', auditType: 'WEB', status: 'DRAFT',
   });
+  const [remarkText, setRemarkText] = useState('');
+  const [sendingRemark, setSendingRemark] = useState(false);
+
+  const isManager = user && project && (
+    user.role === 'SUPER_ADMIN' ||
+    project.members?.some((m) => m.user.id === user.id && m.role === 'MANAGER')
+  );
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -124,7 +151,25 @@ export default function ProjectDetailPage() {
     }
   }, [token, projectId]);
 
+  const loadStats = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await statsApi.getProjectStats(projectId, token);
+      setStats(data);
+    } catch { /* stats are non-critical */ }
+  }, [token, projectId]);
+
+  const loadRemarks = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await remarksApi.getAll(projectId, token);
+      setRemarks(data);
+    } catch { /* remarks are manager-only, may fail for non-managers */ }
+  }, [token, projectId]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => { loadRemarks(); }, [loadRemarks]);
 
   useEffect(() => {
     if (project) {
@@ -147,6 +192,7 @@ export default function ProjectDetailPage() {
       setScopeForm({ name: '', description: '' });
       setShowAddScope(false);
       load();
+      loadStats();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur');
     } finally {
@@ -160,15 +206,11 @@ export default function ProjectDetailPage() {
     try {
       await scopesApi.remove(projectId, scopeId, token);
       load();
+      loadStats();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur');
     }
   };
-
-  const canEdit = user && project && (
-    user.role === 'SUPER_ADMIN' ||
-    project.members?.some((m) => m.user.id === user.id && m.role === 'MANAGER')
-  );
 
   const startEditing = () => {
     if (!project) return;
@@ -195,10 +237,36 @@ export default function ProjectDetailPage() {
       await projectsApi.update(projectId, editForm, token);
       setEditing(false);
       load();
+      loadStats();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur lors de la mise à jour');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendRemark = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !remarkText.trim()) return;
+    setSendingRemark(true);
+    try {
+      await remarksApi.create(projectId, remarkText.trim(), token);
+      setRemarkText('');
+      loadRemarks();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    } finally {
+      setSendingRemark(false);
+    }
+  };
+
+  const handleDeleteRemark = async (remarkId: string) => {
+    if (!token) return;
+    try {
+      await remarksApi.remove(projectId, remarkId, token);
+      loadRemarks();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
     }
   };
 
@@ -218,15 +286,16 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const team = (project.members || []).map((m) => ({
-    id: m.user.id,
-    name: `${m.user.firstName} ${m.user.lastName}`,
-  }));
   const progress = progressPercent(project);
+  const alertCount = stats ? (
+    (stats.alerts.isLate ? 1 : 0) +
+    stats.alerts.stalledScopes.length +
+    (stats.alerts.unconfirmedFindings > 0 ? 1 : 0)
+  ) : 0;
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="px-4 sm:px-8 pt-4 sm:pt-6">
+      <div className="px-4 sm:px-8 pt-4 sm:pt-6 pb-8">
         {/* Header */}
         {editing ? (
           <form onSubmit={handleSave}>
@@ -344,7 +413,15 @@ export default function ProjectDetailPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono mb-1">
                   {project.clientCompany} · {AUDIT_LABELS[project.auditType]}
                 </p>
-                <h1 className="text-2xl font-bold">{project.name}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold">{project.name}</h1>
+                  {stats?.alerts.isLate && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                      style={{ background: 'oklch(0.65 0.2 25 / 0.15)', color: 'oklch(0.65 0.2 25)' }}>
+                      <AlertTriangle size={10} /> EN RETARD
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                   <span className="font-mono">
                     {new Date(project.startDate).toLocaleDateString('fr-FR')} — {new Date(project.endDate).toLocaleDateString('fr-FR')}
@@ -352,7 +429,7 @@ export default function ProjectDetailPage() {
                   <span className="capitalize">{STATUS_PHASE[project.status]}</span>
                 </div>
               </div>
-              {canEdit && (
+              {isManager && (
                 <Button variant="outline" size="sm" onClick={startEditing}>
                   <Pencil className="mr-1 h-3 w-3" /> Éditer
                 </Button>
@@ -363,8 +440,11 @@ export default function ProjectDetailPage() {
             <div className="mb-6">
               <div className="h-1 bg-secondary rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full transition-all"
-                  style={{ width: `${progress}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${progress}%`,
+                    background: stats?.alerts.isLate ? 'oklch(0.65 0.2 25)' : 'var(--primary)',
+                  }}
                 />
               </div>
               <div className="flex justify-between mt-1 text-[10.5px] text-muted-foreground font-mono">
@@ -381,10 +461,141 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
+        {/* Alerts banner */}
+        {stats && alertCount > 0 && (
+          <div className="mb-4 rounded-xl border p-3 space-y-1.5"
+            style={{ borderColor: 'oklch(0.65 0.2 25 / 0.3)', background: 'oklch(0.65 0.2 25 / 0.05)' }}>
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'oklch(0.65 0.2 25)' }}>
+              <AlertTriangle size={13} /> Alertes ({alertCount})
+            </div>
+            <div className="space-y-1">
+              {stats.alerts.isLate && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Clock size={11} className="text-muted-foreground" />
+                  <span>Projet en retard — date de fin dépassée</span>
+                </div>
+              )}
+              {stats.alerts.stalledScopes.length > 0 && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Target size={11} className="text-muted-foreground" />
+                  <span>{stats.alerts.stalledScopes.length} périmètre{stats.alerts.stalledScopes.length > 1 ? 's' : ''} sans activité depuis 7 jours</span>
+                </div>
+              )}
+              {stats.alerts.unconfirmedFindings > 0 && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Bug size={11} className="text-muted-foreground" />
+                  <span>{stats.alerts.unconfirmedFindings} finding{stats.alerts.unconfirmedFindings > 1 ? 's' : ''} non confirmé{stats.alerts.unconfirmedFindings > 1 ? 's' : ''}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Stats cards */}
+        {stats && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <StatCard
+              label="Périmètres"
+              value={`${stats.scopes.completed}/${stats.scopes.total}`}
+              sub={`${stats.scopes.completionPercent}% terminés`}
+              icon={<Target size={14} />}
+              color="oklch(0.60 0.15 145)"
+            />
+            <StatCard
+              label="Findings"
+              value={String(stats.findings.total)}
+              sub={`${stats.findings.bySeverity.CRITICAL || 0} critiques`}
+              icon={<Bug size={14} />}
+              color="oklch(0.65 0.2 25)"
+            />
+            <StatCard
+              label="Tâches"
+              value={`${stats.tasks.byStatus.DONE || 0}/${stats.tasks.total}`}
+              sub={`${stats.tasks.completionPercent}% terminées`}
+              icon={<ListChecks size={14} />}
+              color="oklch(0.65 0.15 250)"
+            />
+            <StatCard
+              label="Timeline"
+              value={`J${stats.timeline.daysElapsed}`}
+              sub={`/ ${stats.timeline.daysTotal} jours`}
+              icon={<Clock size={14} />}
+              color={stats.alerts.isLate ? 'oklch(0.65 0.2 25)' : 'oklch(0.6 0.12 60)'}
+            />
+          </div>
+        )}
+
         {/* Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
           {/* Left column */}
           <div className="flex flex-col gap-4">
+            {/* Findings by severity */}
+            {stats && stats.findings.total > 0 && (
+              <div className="rounded-xl bg-card p-4">
+                <div className="cap mb-3">Findings par sévérité</div>
+                <div className="flex gap-1.5 h-3 rounded-full overflow-hidden mb-2">
+                  {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].map((sev) => {
+                    const count = stats.findings.bySeverity[sev] || 0;
+                    if (!count) return null;
+                    const pct = (count / stats.findings.total) * 100;
+                    return (
+                      <div
+                        key={sev}
+                        style={{ width: `${pct}%`, background: SEV_COLORS[sev], minWidth: 4 }}
+                        title={`${sev}: ${count}`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].map((sev) => (
+                    <div key={sev} className="flex items-center gap-1.5 text-xs">
+                      <span className="w-2 h-2 rounded-full" style={{ background: SEV_COLORS[sev] }} />
+                      <span className="text-muted-foreground">{sev.toLowerCase()}</span>
+                      <span className="font-mono font-semibold">{stats.findings.bySeverity[sev] || 0}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {stats.findings.byAuthor.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <div className="text-[10.5px] text-muted-foreground uppercase tracking-wider mb-1.5">Par auditeur</div>
+                    <div className="space-y-1">
+                      {stats.findings.byAuthor.map((a) => (
+                        <div key={a.userId} className="flex items-center justify-between text-xs">
+                          <span>{a.name}</span>
+                          <span className="font-mono font-semibold">{a.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Task progress by member */}
+            {stats && stats.tasks.byMember.length > 0 && (
+              <div className="rounded-xl bg-card p-4">
+                <div className="cap mb-3">Tâches par membre</div>
+                <div className="space-y-2.5">
+                  {stats.tasks.byMember.map((m) => {
+                    const pct = m.total ? Math.round((m.done / m.total) * 100) : 0;
+                    return (
+                      <div key={m.memberId}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span>{m.name}</span>
+                          <span className="font-mono text-muted-foreground">{m.done}/{m.total}</span>
+                        </div>
+                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: 'var(--accent)' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Cadrage */}
             <div className="rounded-xl bg-card p-4">
               <div className="cap mb-2.5">Cadrage</div>
@@ -441,41 +652,52 @@ export default function ProjectDetailPage() {
                   Aucun périmètre. Ajoutez-en pour démarrer le test.
                 </div>
               ) : (
-                project.scopes.map((scope: Scope) => (
-                  <div
-                    key={scope.id}
-                    onClick={() => router.push(`/dashboard/projects/${projectId}/scopes/${scope.id}`)}
-                    className="grid gap-3.5 items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                    style={{ gridTemplateColumns: '1fr auto auto auto' }}
-                  >
-                    <div className="min-w-0">
-                      <div className="font-mono text-sm font-medium">{scope.name}</div>
-                      {scope.description && (
-                        <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {scope.description}
-                        </div>
-                      )}
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <FileText className="h-3 w-3" />
-                      {scope._count?.notes ?? 0}
-                    </span>
-                    <span className={`badge badge-${SCOPE_BADGE[scope.status]}`}>
-                      {SCOPE_LABEL[scope.status]}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteScope(scope.id);
-                      }}
+                project.scopes.map((scope: Scope) => {
+                  const isStalled = stats?.alerts.stalledScopes.includes(scope.id);
+                  return (
+                    <div
+                      key={scope.id}
+                      onClick={() => router.push(`/dashboard/projects/${projectId}/scopes/${scope.id}`)}
+                      className="grid gap-3.5 items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                      style={{ gridTemplateColumns: '1fr auto auto auto' }}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))
+                      <div className="min-w-0">
+                        <div className="font-mono text-sm font-medium flex items-center gap-1.5">
+                          {scope.name}
+                          {isStalled && (
+                            <span className="text-[9px] px-1 py-0.5 rounded font-sans"
+                              style={{ background: 'oklch(0.75 0.15 80 / 0.15)', color: 'oklch(0.65 0.15 80)' }}>
+                              inactif
+                            </span>
+                          )}
+                        </div>
+                        {scope.description && (
+                          <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {scope.description}
+                          </div>
+                        )}
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <FileText className="h-3 w-3" />
+                        {scope._count?.notes ?? 0}
+                      </span>
+                      <span className={`badge badge-${SCOPE_BADGE[scope.status]}`}>
+                        {SCOPE_LABEL[scope.status]}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteScope(scope.id);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -509,6 +731,83 @@ export default function ProjectDetailPage() {
               )}
             </div>
 
+            {/* Scope completion */}
+            {stats && stats.scopes.total > 0 && (
+              <div className="rounded-xl bg-card p-4">
+                <div className="cap mb-2.5">Avancement périmètres</div>
+                <div className="flex gap-1 h-2 rounded-full overflow-hidden mb-2">
+                  {[
+                    { key: 'completed', color: 'oklch(0.60 0.15 145)', count: stats.scopes.completed },
+                    { key: 'inReview', color: 'oklch(0.75 0.15 80)', count: stats.scopes.inReview },
+                    { key: 'inProgress', color: 'oklch(0.65 0.15 250)', count: stats.scopes.inProgress },
+                    { key: 'notStarted', color: 'var(--secondary)', count: stats.scopes.notStarted },
+                  ].map((s) => {
+                    if (!s.count) return null;
+                    return (
+                      <div
+                        key={s.key}
+                        style={{ width: `${(s.count / stats.scopes.total) * 100}%`, background: s.color, minWidth: 3 }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Terminés</span><span className="font-mono">{stats.scopes.completed}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">En revue</span><span className="font-mono">{stats.scopes.inReview}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">En cours</span><span className="font-mono">{stats.scopes.inProgress}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Non démarrés</span><span className="font-mono">{stats.scopes.notStarted}</span></div>
+                </div>
+              </div>
+            )}
+
+            {/* Manager remarks */}
+            {isManager && (
+              <div className="rounded-xl bg-card p-4">
+                <div className="cap mb-2.5 flex items-center gap-1.5">
+                  <MessageSquare size={11} />
+                  Remarques manager
+                </div>
+                <form onSubmit={handleSendRemark} className="flex gap-2 mb-3">
+                  <Input
+                    placeholder="Ajouter une remarque…"
+                    value={remarkText}
+                    onChange={(e) => setRemarkText(e.target.value)}
+                    className="text-xs"
+                  />
+                  <Button type="submit" size="icon" className="h-8 w-8 shrink-0" disabled={sendingRemark || !remarkText.trim()}>
+                    {sendingRemark ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                  </Button>
+                </form>
+                {remarks.length === 0 ? (
+                  <div className="text-xs text-muted-foreground text-center py-2">Aucune remarque</div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-auto">
+                    {remarks.map((r) => (
+                      <div key={r.id} className="rounded-lg border border-border p-2.5 group">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10.5px] font-medium">
+                            {r.author.firstName} {r.author.lastName}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {new Date(r.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <button
+                              type="button"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteRemark(r.id)}
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs leading-relaxed">{r.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -530,6 +829,25 @@ function Block({ label, value }: { label: string; value?: string }) {
       <div className="text-sm leading-relaxed">
         {value || <span className="text-muted-foreground">—</span>}
       </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, icon, color }: {
+  label: string; value: string; sub: string;
+  icon: React.ReactNode; color: string;
+}) {
+  return (
+    <div className="rounded-xl bg-card border border-border p-3">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <div className="w-6 h-6 rounded-md flex items-center justify-center"
+          style={{ background: `color-mix(in oklch, ${color} 15%, transparent)`, color }}>
+          {icon}
+        </div>
+        <span className="text-[10.5px] text-muted-foreground uppercase tracking-wider">{label}</span>
+      </div>
+      <div className="text-lg font-bold font-mono leading-none">{value}</div>
+      <div className="text-[10.5px] text-muted-foreground font-mono mt-0.5">{sub}</div>
     </div>
   );
 }

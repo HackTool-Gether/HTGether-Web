@@ -718,7 +718,9 @@ export const templatesApi = {
 export interface Report {
   id: string;
   projectId: string;
-  content: any; // ProseMirror JSON document
+  name: string;
+  content: any;
+  templateId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -731,6 +733,32 @@ export const reportsApi = {
     apiRequest<Report>(`/projects/${projectId}/report`, {
       method: 'PUT',
       body: JSON.stringify({ content }),
+      token,
+    }),
+
+  getAll: (projectId: string, token: string) =>
+    apiRequest<Report[]>(`/projects/${projectId}/reports`, { token }),
+
+  create: (projectId: string, data: { name: string; templateId?: string }, token: string) =>
+    apiRequest<Report>(`/projects/${projectId}/reports`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getOne: (reportId: string, token: string) =>
+    apiRequest<Report>(`/reports/${reportId}`, { token }),
+
+  updateOne: (reportId: string, data: Partial<{ name: string; content: any; templateId: string }>, token: string) =>
+    apiRequest<Report>(`/reports/${reportId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (reportId: string, token: string) =>
+    apiRequest<void>(`/reports/${reportId}`, {
+      method: 'DELETE',
       token,
     }),
 };
@@ -971,3 +999,180 @@ export interface OnboardingData {
     domain?: string;
   };
 }
+
+// ── Project remarks & stats ──
+
+export interface ProjectRemark {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  author: { id: string; firstName: string; lastName: string };
+}
+
+export interface ProjectStats {
+  scopes: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    notStarted: number;
+    inReview: number;
+    completionPercent: number;
+  };
+  findings: {
+    total: number;
+    bySeverity: Record<string, number>;
+    byStatus: Record<string, number>;
+    byAuthor: { userId: string; name: string; count: number }[];
+  };
+  tasks: {
+    total: number;
+    byStatus: Record<string, number>;
+    byMember: { memberId: string; name: string; total: number; done: number }[];
+    completionPercent: number;
+  };
+  timeline: {
+    startDate: string;
+    endDate: string;
+    daysTotal: number;
+    daysElapsed: number;
+    progressPercent: number;
+    isLate: boolean;
+  };
+  alerts: {
+    isLate: boolean;
+    stalledScopes: string[];
+    unconfirmedFindings: number;
+  };
+}
+
+export interface WorkloadMember {
+  memberId: string;
+  userId: string;
+  name: string;
+  role: string;
+  tasks: { total: number; done: number; inProgress: number; todo: number; backlog: number };
+}
+
+export interface WorkloadScope {
+  scopeId: string;
+  name: string;
+  status: ScopeStatus;
+  assignedMembers: string[];
+  unassigned: boolean;
+}
+
+export interface WorkloadData {
+  members: WorkloadMember[];
+  scopes: WorkloadScope[];
+}
+
+export interface DashboardStats {
+  projects: { total: number; active: number };
+  findings: { open: number; bySeverity: Record<string, number> };
+  tasks: { total: number; done: number; inProgress: number };
+  users: { active: number };
+  recentFindings: {
+    id: string; title: string; severity: string;
+    projectName: string; projectId: string;
+    authorName: string; createdAt: string;
+  }[];
+  recentTasks: {
+    id: string; title: string;
+    projectName: string; projectId: string;
+    assigneeName: string | null; completedAt: string;
+  }[];
+}
+
+export const dashboardApi = {
+  getStats: (token: string) =>
+    apiRequest<DashboardStats>('/projects/dashboard-stats', { token }),
+};
+
+export const workloadApi = {
+  get: (projectId: string, token: string) =>
+    apiRequest<WorkloadData>(`/projects/${projectId}/workload`, { token }),
+
+  assignScope: (projectId: string, scopeId: string, memberId: string, token: string) =>
+    apiRequest<void>(`/projects/${projectId}/scopes/${scopeId}/assign/${memberId}`, {
+      method: 'POST',
+      token,
+    }),
+
+  unassignScope: (projectId: string, scopeId: string, memberId: string, token: string) =>
+    apiRequest<void>(`/projects/${projectId}/scopes/${scopeId}/assign/${memberId}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
+// ── Attack chains ──
+
+export interface AttackChainFinding {
+  id: string;
+  order: number;
+  finding: { id: string; title: string; severity: string; slug: string | null; status: string; description?: string };
+}
+
+export interface AttackChain {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  findings: AttackChainFinding[];
+}
+
+export const attackChainsApi = {
+  getAll: (projectId: string, token: string) =>
+    apiRequest<AttackChain[]>(`/projects/${projectId}/attack-chains`, { token }),
+
+  create: (projectId: string, data: { name: string; description?: string }, token: string) =>
+    apiRequest<AttackChain>(`/projects/${projectId}/attack-chains`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getOne: (id: string, token: string) =>
+    apiRequest<AttackChain>(`/attack-chains/${id}`, { token }),
+
+  update: (id: string, data: { name?: string; description?: string }, token: string) =>
+    apiRequest<AttackChain>(`/attack-chains/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (id: string, token: string) =>
+    apiRequest<void>(`/attack-chains/${id}`, { method: 'DELETE', token }),
+
+  setFindings: (id: string, findingIds: string[], token: string) =>
+    apiRequest<AttackChain>(`/attack-chains/${id}/findings`, {
+      method: 'PUT',
+      body: JSON.stringify({ findingIds }),
+      token,
+    }),
+};
+
+export const remarksApi = {
+  getAll: (projectId: string, token: string) =>
+    apiRequest<ProjectRemark[]>(`/projects/${projectId}/remarks`, { token }),
+
+  create: (projectId: string, content: string, token: string) =>
+    apiRequest<ProjectRemark>(`/projects/${projectId}/remarks`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+      token,
+    }),
+
+  remove: (projectId: string, remarkId: string, token: string) =>
+    apiRequest<void>(`/projects/${projectId}/remarks/${remarkId}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
+export const statsApi = {
+  getProjectStats: (projectId: string, token: string) =>
+    apiRequest<ProjectStats>(`/projects/${projectId}/stats`, { token }),
+};

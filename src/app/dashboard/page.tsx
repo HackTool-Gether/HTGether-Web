@@ -1,23 +1,32 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AvatarStack } from '@/components/shell/avatar';
 import { useAuth } from '@/lib/auth-context';
-import { projectsApi, type Project } from '@/lib/api';
+import { projectsApi, dashboardApi, type Project, type DashboardStats } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   Folder,
   Bug,
-  Clock,
-  FileText,
+  ListChecks,
+  Users,
   Plus,
   ArrowRight,
   Activity,
-  Network,
   Command,
+  FileText,
   Loader2,
+  CheckCircle2,
 } from 'lucide-react';
+
+const SEV_COLORS: Record<string, string> = {
+  CRITICAL: 'oklch(0.65 0.2 25)',
+  HIGH: 'oklch(0.7 0.15 40)',
+  MEDIUM: 'oklch(0.65 0.15 80)',
+  LOW: 'oklch(0.6 0.12 250)',
+  INFO: 'oklch(0.5 0.05 250)',
+};
 
 function StatusPhase(status: Project['status']): string {
   const map: Record<Project['status'], string> = {
@@ -41,20 +50,41 @@ function progressFor(p: Project): number {
   return map[p.status] ?? 0;
 }
 
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "à l'instant";
+  if (mins < 60) return `il y a ${mins}min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `il y a ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `il y a ${days}j`;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, token } = useAuth();
   const [projects, setProjects] = useState<Project[] | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadAll = useCallback(async () => {
     if (!token) return;
-    projectsApi
-      .getAll(token)
-      .then((data) => setProjects(data))
-      .catch(() => setProjects([]))
-      .finally(() => setLoading(false));
+    try {
+      const [p, s] = await Promise.all([
+        projectsApi.getAll(token),
+        dashboardApi.getStats(token),
+      ]);
+      setProjects(p);
+      setStats(s);
+    } catch {
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   const today = new Date().toLocaleDateString('fr-FR', {
     weekday: 'long',
@@ -73,6 +103,7 @@ export default function DashboardPage() {
           firstName={user?.firstName}
           today={today}
           projects={projects || []}
+          stats={stats}
           loading={loading}
           onOpen={(id) => router.push(`/dashboard/projects/${id}`)}
           onNew={() => router.push('/dashboard/projects?new=1')}
@@ -183,6 +214,7 @@ interface DashboardActiveProps {
   firstName?: string;
   today: string;
   projects: Project[];
+  stats: DashboardStats | null;
   loading: boolean;
   onOpen: (id: string) => void;
   onNew: () => void;
@@ -193,17 +225,17 @@ function DashboardActive({
   firstName,
   today,
   projects,
+  stats,
   loading,
   onOpen,
   onNew,
   onAllProjects,
 }: DashboardActiveProps) {
-  const active = projects.filter((p) => p.status === 'IN_PROGRESS').length;
-  const inReview = projects.filter((p) => p.status === 'IN_REVIEW').length;
+  const router = useRouter();
   const recent = projects.slice(0, 3);
 
   return (
-    <div className="px-4 sm:px-8 pt-4 sm:pt-6">
+    <div className="px-4 sm:px-8 pt-4 sm:pt-6 pb-8">
       {/* Header */}
       <div className="flex items-end justify-between gap-4 mb-6">
         <div>
@@ -221,31 +253,64 @@ function DashboardActive({
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {[
-          { label: 'Projets actifs', value: active, hint: `${inReview} en revue`, icon: Folder },
-          { label: 'Findings ouvertes', value: '—', hint: 'à venir', icon: Bug },
-          { label: 'Heures engagées', value: '—', hint: 'à venir', icon: Clock },
-          { label: 'Rapports en cours', value: '—', hint: 'à venir', icon: FileText },
-        ].map((s) => {
-          const Icon = s.icon;
-          return (
-            <div key={s.label} className="rounded-xl bg-card p-4">
-              <div className="flex items-center gap-2 mb-2.5">
-                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {s.label}
-                </span>
-              </div>
-              <p className="text-2xl font-semibold tracking-tight font-mono">
-                {s.value}
-              </p>
-              {s.hint && (
-                <p className="text-xs text-muted-foreground mt-1">{s.hint}</p>
-              )}
-            </div>
-          );
-        })}
+        <StatCard
+          label="Projets actifs"
+          value={stats ? String(stats.projects.active) : '—'}
+          hint={stats ? `${stats.projects.total} au total` : ''}
+          icon={<Folder className="h-3.5 w-3.5" />}
+        />
+        <StatCard
+          label="Findings ouvertes"
+          value={stats ? String(stats.findings.open) : '—'}
+          hint={stats ? `${stats.findings.bySeverity.CRITICAL || 0} critiques` : ''}
+          icon={<Bug className="h-3.5 w-3.5" />}
+          hintColor={stats && stats.findings.bySeverity.CRITICAL > 0 ? SEV_COLORS.CRITICAL : undefined}
+        />
+        <StatCard
+          label="Tâches"
+          value={stats ? `${stats.tasks.done}/${stats.tasks.total}` : '—'}
+          hint={stats ? `${stats.tasks.inProgress} en cours` : ''}
+          icon={<ListChecks className="h-3.5 w-3.5" />}
+        />
+        <StatCard
+          label="Utilisateurs actifs"
+          value={stats ? String(stats.users.active) : '—'}
+          hint="sur la plateforme"
+          icon={<Users className="h-3.5 w-3.5" />}
+        />
       </div>
+
+      {/* Findings by severity bar */}
+      {stats && stats.findings.open > 0 && (
+        <div className="rounded-xl bg-card p-4 mb-6">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            Findings ouvertes par sévérité
+          </div>
+          <div className="flex gap-1 h-3 rounded-full overflow-hidden mb-2">
+            {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].map((sev) => {
+              const count = stats.findings.bySeverity[sev] || 0;
+              if (!count) return null;
+              const pct = (count / stats.findings.open) * 100;
+              return (
+                <div
+                  key={sev}
+                  style={{ width: `${pct}%`, background: SEV_COLORS[sev], minWidth: 4 }}
+                  title={`${sev}: ${count}`}
+                />
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].map((sev) => (
+              <div key={sev} className="flex items-center gap-1.5 text-xs">
+                <span className="w-2 h-2 rounded-full" style={{ background: SEV_COLORS[sev] }} />
+                <span className="text-muted-foreground">{sev.toLowerCase()}</span>
+                <span className="font-mono font-semibold">{stats.findings.bySeverity[sev] || 0}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4">
@@ -308,20 +373,109 @@ function DashboardActive({
           </div>
         </div>
 
-        {/* Activity */}
-        <div className="rounded-xl bg-card">
-          <div className="flex items-center justify-between px-4 py-3">
-            <span className="text-sm font-medium">Activité récente</span>
-            <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+        {/* Activity feed */}
+        <div className="flex flex-col gap-4">
+          {/* Recent findings */}
+          <div className="rounded-xl bg-card">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium">Derniers findings</span>
+              <Bug className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <div className="px-4 pb-3">
+              {!stats || stats.recentFindings.length === 0 ? (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-2">
+                  <Activity className="h-3.5 w-3.5" />
+                  Aucun finding récent.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {stats.recentFindings.map((f) => (
+                    <div
+                      key={f.id}
+                      className="flex items-start gap-2 cursor-pointer hover:bg-muted/30 rounded-lg p-1.5 -mx-1.5 transition-colors"
+                      onClick={() => router.push(`/dashboard/projects/${f.projectId}/findings`)}
+                    >
+                      <span
+                        className="text-[8px] font-bold uppercase px-1 py-0.5 rounded mt-0.5 shrink-0"
+                        style={{
+                          background: `color-mix(in oklch, ${SEV_COLORS[f.severity] || 'gray'} 15%, transparent)`,
+                          color: SEV_COLORS[f.severity] || 'gray',
+                        }}
+                      >
+                        {f.severity.charAt(0)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium truncate">{f.title}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {f.projectName} · {f.authorName} · {timeAgo(f.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="px-4 pb-4">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Network className="h-3.5 w-3.5" />
-              Le flux d&apos;activité collaboratif arrive bientôt.
+
+          {/* Recent completed tasks */}
+          <div className="rounded-xl bg-card">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium">Tâches complétées</span>
+              <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <div className="px-4 pb-3">
+              {!stats || stats.recentTasks.length === 0 ? (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-2">
+                  <Activity className="h-3.5 w-3.5" />
+                  Aucune tâche complétée récemment.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {stats.recentTasks.map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex items-start gap-2 cursor-pointer hover:bg-muted/30 rounded-lg p-1.5 -mx-1.5 transition-colors"
+                      onClick={() => router.push(`/dashboard/projects/${t.projectId}/tasks`)}
+                    >
+                      <CheckCircle2 size={12} className="mt-0.5 shrink-0" style={{ color: 'oklch(0.60 0.15 145)' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium truncate">{t.title}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {t.projectName}
+                          {t.assigneeName && ` · ${t.assigneeName}`}
+                          {' · '}{timeAgo(t.completedAt)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, hint, icon, hintColor }: {
+  label: string; value: string; hint: string;
+  icon: React.ReactNode; hintColor?: string;
+}) {
+  return (
+    <div className="rounded-xl bg-card p-4">
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="text-muted-foreground">{icon}</span>
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {label}
+        </span>
+      </div>
+      <p className="text-2xl font-semibold tracking-tight font-mono">{value}</p>
+      {hint && (
+        <p className="text-xs mt-1" style={{ color: hintColor || 'var(--muted-foreground)' }}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

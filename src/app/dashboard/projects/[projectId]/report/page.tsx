@@ -42,6 +42,10 @@ import {
   Eye,
   ChevronDown,
   X,
+  Copy,
+  Check,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -154,6 +158,73 @@ function makeDefault(findings: Finding[]): ReportDataV3 {
       .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity))
       .map((f) => f.id),
   };
+}
+
+// ── Clipboard helpers ──────────────────────────────────────────────────
+
+function tiptapToText(node: any): string {
+  if (!node) return '';
+  if (typeof node === 'string') return node;
+  if (node.type === 'text') return node.text || '';
+  if (node.type === 'hardBreak') return '\n';
+  const children = (node.content || []).map(tiptapToText).join('');
+  switch (node.type) {
+    case 'paragraph': return children + '\n\n';
+    case 'heading': return '#'.repeat(node.attrs?.level || 1) + ' ' + children + '\n\n';
+    case 'bulletList': return children;
+    case 'orderedList': return children;
+    case 'listItem': return '- ' + children;
+    case 'codeBlock': return '```\n' + children + '```\n\n';
+    case 'blockquote': return children.split('\n').map((l: string) => '> ' + l).join('\n') + '\n';
+    default: return children;
+  }
+}
+
+function findingToMarkdown(f: Finding): string {
+  const parts = [
+    `## ${f.title}`,
+    `**Sévérité :** ${f.severity}${f.cvssScore != null ? ` (CVSS ${f.cvssScore.toFixed(1)})` : ''}`,
+    `**Statut :** ${STATUS_LABEL[f.status] || f.status}`,
+    f.slug ? `**Réf :** ${f.slug}` : '',
+    '',
+    f.description ? `### Description\n${f.description}` : '',
+    f.proof ? `### Preuve\n${f.proof}` : '',
+    f.impact ? `### Impact\n${f.impact}` : '',
+    f.remediation ? `### Remédiation\n${f.remediation}` : '',
+    f.references ? `### Références\n${f.references}` : '',
+  ];
+  return parts.filter(Boolean).join('\n');
+}
+
+function CopyBtn({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      title={label || 'Copier'}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '2px 6px',
+        borderRadius: 'var(--r-sm)',
+        fontSize: 10.5,
+        color: copied ? 'var(--st-compliant-fg)' : 'var(--fg-subtle)',
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'color 0.15s',
+      }}
+    >
+      {copied ? <Check size={11} /> : <Copy size={11} />}
+      {label && <span>{copied ? 'Copié' : label}</span>}
+    </button>
+  );
 }
 
 // ── Finding metadata bar ────────────────────────────────────────────────
@@ -376,6 +447,12 @@ function SectionEditor({
       >
         <FileText size={12} />
         {section.predefined ? 'Section prédéfinie' : 'Section personnalisée'}
+        <span style={{ marginLeft: 'auto' }}>
+          <CopyBtn
+            text={`## ${section.title}\n\n${tiptapToText(section.content)}`}
+            label="Copier"
+          />
+        </span>
       </div>
 
       <input
@@ -442,6 +519,9 @@ function FindingEditor({
       >
         <ShieldAlert size={12} />
         Vulnérabilité
+        <span style={{ marginLeft: 'auto' }}>
+          <CopyBtn text={findingToMarkdown(finding)} label="Copier" />
+        </span>
       </div>
 
       <input
@@ -506,6 +586,13 @@ function FindingsSummaryTable({ findings }: { findings: Finding[] }) {
     (a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity),
   );
 
+  const tableMarkdown = sorted.length > 0
+    ? '| Réf. | Vulnérabilité | Sévérité | CVSS | Statut |\n|------|--------------|----------|------|--------|\n' +
+      sorted.map((f) =>
+        `| ${f.slug || '—'} | ${f.title} | ${f.severity} | ${f.cvssScore != null ? f.cvssScore.toFixed(1) : '—'} | ${STATUS_LABEL[f.status] || f.status} |`
+      ).join('\n')
+    : '';
+
   if (sorted.length === 0) {
     return (
       <div style={{ padding: 32, textAlign: 'center', color: 'var(--fg-subtle)', fontSize: 13 }}>
@@ -533,13 +620,17 @@ function FindingsSummaryTable({ findings }: { findings: Finding[] }) {
   };
 
   return (
-    <div
-      style={{
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--r-md)',
-        overflow: 'hidden',
-      }}
-    >
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+        <CopyBtn text={tableMarkdown} label="Copier le tableau" />
+      </div>
+      <div
+        style={{
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-md)',
+          overflow: 'hidden',
+        }}
+      >
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
@@ -588,6 +679,7 @@ function FindingsSummaryTable({ findings }: { findings: Finding[] }) {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -638,6 +730,7 @@ export default function ProjectReportPage() {
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
   const [report, setReport] = useState<Report | null>(null);
   const [sections, setSections] = useState<ReportSection[]>([]);
   const [findingOrder, setFindingOrder] = useState<string[]>([]);
@@ -645,6 +738,7 @@ export default function ProjectReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [creatingReport, setCreatingReport] = useState(false);
 
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -678,18 +772,27 @@ export default function ProjectReportPage() {
     let mounted = true;
     (async () => {
       try {
-        const [proj, fdg, rep, tpls] = await Promise.all([
+        const [proj, fdg, reps, tpls] = await Promise.all([
           projectsApi.getOne(projectId, token),
           findingsApi.getAllByProject(projectId, token),
-          reportsApi.get(projectId, token),
+          reportsApi.getAll(projectId, token).catch(() => [] as Report[]),
           templatesApi.getAll(token),
         ]);
         if (!mounted) return;
         setProject(proj);
         setFindings(fdg);
-        setReport(rep);
         setTemplates(tpls);
-        setSelectedTemplateId(proj.templateId || null);
+
+        let allReports = reps;
+        if (allReports.length === 0) {
+          const rep = await reportsApi.get(projectId, token);
+          allReports = [rep];
+        }
+        setReports(allReports);
+
+        const rep = allReports[0];
+        setReport(rep);
+        setSelectedTemplateId(rep.templateId || proj.templateId || null);
 
         const data = migrateContent(
           rep.content && typeof rep.content === 'object' ? rep.content : null,
@@ -725,8 +828,10 @@ export default function ProjectReportPage() {
       if (!token || !report) return;
       const data: ReportDataV3 = { version: 3, sections: sectionsToSave, findingOrder: orderToSave };
       setSaveState('saving');
-      reportsApi
-        .update(projectId, data, token)
+      const savePromise = report.id
+        ? reportsApi.updateOne(report.id, { content: data }, token)
+        : reportsApi.update(projectId, data, token);
+      savePromise
         .then((r) => { setReport(r); setSaveState('saved'); })
         .catch(() => setSaveState('error'));
     },
@@ -864,6 +969,56 @@ export default function ProjectReportPage() {
     [token, projectId],
   );
 
+  // ── Multi-report management ──
+
+  const switchReport = useCallback(
+    (rep: Report) => {
+      setReport(rep);
+      setSelectedTemplateId(rep.templateId || project?.templateId || null);
+      const data = migrateContent(
+        rep.content && typeof rep.content === 'object' ? rep.content : null,
+        findings,
+      );
+      setSections(data.sections);
+      setFindingOrder(data.findingOrder);
+      if (data.sections.length > 0) {
+        setActiveView({ kind: 'section', id: data.sections[0].id });
+      } else {
+        setActiveView(null);
+      }
+    },
+    [findings, project],
+  );
+
+  const createReport = useCallback(async () => {
+    if (!token || creatingReport) return;
+    setCreatingReport(true);
+    try {
+      const name = `Rapport ${reports.length + 1}`;
+      const rep = await reportsApi.create(projectId, { name }, token);
+      setReports((prev) => [...prev, rep]);
+      switchReport(rep);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    } finally {
+      setCreatingReport(false);
+    }
+  }, [token, projectId, reports.length, creatingReport, switchReport]);
+
+  const deleteReport = useCallback(async (reportId: string) => {
+    if (!token || reports.length <= 1) return;
+    try {
+      await reportsApi.remove(reportId, token);
+      const remaining = reports.filter((r) => r.id !== reportId);
+      setReports(remaining);
+      if (report?.id === reportId && remaining.length > 0) {
+        switchReport(remaining[0]);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    }
+  }, [token, reports, report, switchReport]);
+
   // ── PDF preview + export ──
 
   const loadPdfPreview = useCallback(async () => {
@@ -947,6 +1102,43 @@ export default function ProjectReportPage() {
             </Button>
             <h1 className="text-2xl font-bold">Rapport</h1>
           </div>
+
+          {/* Report tabs */}
+          {reports.length > 1 && (
+            <div className="flex items-center gap-1 mx-4">
+              {reports.map((r) => (
+                <div key={r.id} className="flex items-center group">
+                  <button
+                    onClick={() => switchReport(r)}
+                    className={`px-3 py-1 text-xs rounded-md transition-colors cursor-pointer ${
+                      report?.id === r.id
+                        ? 'bg-accent/15 text-accent font-medium'
+                        : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {r.name || 'Sans titre'}
+                  </button>
+                  {reports.length > 1 && report?.id !== r.id && (
+                    <button
+                      onClick={() => deleteReport(r.id)}
+                      className="h-4 w-4 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={createReport}
+                disabled={creatingReport}
+                className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+                title="Nouveau rapport"
+              >
+                {creatingReport ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             <span
               className="font-mono text-[11px]"
@@ -965,6 +1157,19 @@ export default function ProjectReportPage() {
             <span className="font-mono text-[11px] text-muted-foreground">
               {sections.length} section{sections.length !== 1 ? 's' : ''} · {findings.length} finding{findings.length !== 1 ? 's' : ''}
             </span>
+
+            {reports.length <= 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-[10px] text-muted-foreground"
+                onClick={createReport}
+                disabled={creatingReport}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Nouveau rapport
+              </Button>
+            )}
 
             <div className="h-4 w-px bg-border" />
 
