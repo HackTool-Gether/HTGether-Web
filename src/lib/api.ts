@@ -1046,6 +1046,44 @@ export interface ProjectStats {
   };
 }
 
+export interface WorkloadMember {
+  memberId: string;
+  userId: string;
+  name: string;
+  role: string;
+  tasks: { total: number; done: number; inProgress: number; todo: number; backlog: number };
+}
+
+export interface WorkloadScope {
+  scopeId: string;
+  name: string;
+  status: ScopeStatus;
+  assignedMembers: string[];
+  unassigned: boolean;
+}
+
+export interface WorkloadData {
+  members: WorkloadMember[];
+  scopes: WorkloadScope[];
+}
+
+export const workloadApi = {
+  get: (projectId: string, token: string) =>
+    apiRequest<WorkloadData>(`/projects/${projectId}/workload`, { token }),
+
+  assignScope: (projectId: string, scopeId: string, memberId: string, token: string) =>
+    apiRequest<void>(`/projects/${projectId}/scopes/${scopeId}/assign/${memberId}`, {
+      method: 'POST',
+      token,
+    }),
+
+  unassignScope: (projectId: string, scopeId: string, memberId: string, token: string) =>
+    apiRequest<void>(`/projects/${projectId}/scopes/${scopeId}/assign/${memberId}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
 export const remarksApi = {
   getAll: (projectId: string, token: string) =>
     apiRequest<ProjectRemark[]>(`/projects/${projectId}/remarks`, { token }),
