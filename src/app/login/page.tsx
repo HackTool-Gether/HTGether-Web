@@ -9,8 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, Globe, Server, KeyRound, Shield } from 'lucide-react';
+import { Loader2, AlertCircle, Globe, Server, KeyRound, Shield, Github, Chrome, Lock, Mail } from 'lucide-react';
 import { HtgLogo } from '@/components/ui/htg-logo';
+
+function getProviderIcon(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes('github')) return Github;
+  if (lower.includes('google')) return Chrome;
+  if (lower.includes('microsoft') || lower.includes('azure') || lower.includes('entra')) return KeyRound;
+  return Globe;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -76,9 +84,19 @@ export default function LoginPage() {
           const redirectUri = window.location.origin + '/login';
           const response = await authApi.oidcCallback(providerId, window.location.href, redirectUri);
           loginWithTokens(response);
-          router.push('/dashboard');
+          if (response.user.mustChangePassword) {
+            router.push('/change-password');
+          } else {
+            router.push('/dashboard');
+          }
         } catch (err) {
-          setError(err instanceof ApiError ? err.message : 'SSO authentication failed');
+          if (err instanceof ApiError) {
+            if (err.status === 403) setError('Ce compte a été désactivé');
+            else setError(err.message || 'Échec de l\'authentification SSO');
+          } else {
+            setError('Échec de l\'authentification SSO. Veuillez réessayer.');
+          }
+          window.history.replaceState({}, '', '/login');
         } finally {
           setLoading(false);
         }
@@ -129,11 +147,12 @@ export default function LoginPage() {
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 401) setError('Identifiants LDAP incorrects');
+        if (err.status === 401) setError('Identifiants LDAP incorrects. Vérifiez votre email et mot de passe.');
         else if (err.status === 403) setError('Ce compte a été désactivé');
+        else if (err.status === 400) setError('L\'authentification LDAP n\'est pas disponible');
         else setError(err.message);
       } else {
-        setError('Impossible de se connecter au serveur');
+        setError('Impossible de se connecter au serveur LDAP');
       }
     } finally {
       setLoading(false);
@@ -150,7 +169,7 @@ export default function LoginPage() {
       sessionStorage.setItem('htgether_oidc_provider', provider.id);
       window.location.href = authUrl;
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to start SSO');
+      setError(err instanceof ApiError ? err.message : 'Impossible de démarrer l\'authentification SSO');
       setSsoLoading(null);
     }
   };
@@ -203,22 +222,28 @@ export default function LoginPage() {
           {/* SSO Buttons */}
           {(oidcProviders.length > 0 || samlProviders.length > 0) && (
             <div className="flex flex-col gap-2.5 mb-6">
-              {oidcProviders.map((provider) => (
-                <Button
-                  key={provider.id}
-                  variant="outline"
-                  onClick={() => handleOidcLogin(provider)}
-                  disabled={ssoLoading === provider.id}
-                  className="w-full h-11 text-sm font-medium gap-2.5"
-                >
-                  {ssoLoading === provider.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Globe className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  Continuer avec {provider.name}
-                </Button>
-              ))}
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">
+                Authentification SSO
+              </p>
+              {oidcProviders.map((provider) => {
+                const Icon = getProviderIcon(provider.name);
+                return (
+                  <Button
+                    key={provider.id}
+                    variant="outline"
+                    onClick={() => handleOidcLogin(provider)}
+                    disabled={ssoLoading === provider.id}
+                    className="w-full h-11 text-sm font-medium gap-2.5 cursor-pointer"
+                  >
+                    {ssoLoading === provider.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Icon className="h-4 w-4" />
+                    )}
+                    Continuer avec {provider.name}
+                  </Button>
+                );
+              })}
               {samlProviders.map((provider) => (
                 <Button
                   key={provider.id}
@@ -226,7 +251,7 @@ export default function LoginPage() {
                   disabled
                   className="w-full h-11 text-sm font-medium gap-2.5 opacity-50"
                 >
-                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  <KeyRound className="h-4 w-4" />
                   Continuer avec {provider.name}
                 </Button>
               ))}
@@ -237,7 +262,7 @@ export default function LoginPage() {
           {(oidcProviders.length > 0 || samlProviders.length > 0) && hasCredentialForm && (
             <div className="flex items-center gap-4 mb-6">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground uppercase tracking-widest">ou</span>
+              <span className="text-xs text-muted-foreground uppercase tracking-widest">ou identifiants</span>
               <div className="flex-1 h-px bg-border" />
             </div>
           )}
@@ -245,20 +270,28 @@ export default function LoginPage() {
           {/* Credential tabs */}
           {hasMultipleCredentialMethods && (
             <div className="flex rounded-lg bg-muted p-1 mb-5 border border-border">
-              {(['LOCAL', 'LDAP'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => { setActiveTab(tab); setError(''); }}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-[13px] font-medium transition-all ${
-                    activeTab === tab
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {tab === 'LDAP' && <Server className="h-3.5 w-3.5" />}
-                  {tab === 'LOCAL' ? 'Email' : 'LDAP'}
-                </button>
-              ))}
+              <button
+                onClick={() => { setActiveTab('LOCAL'); setError(''); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-[13px] font-medium transition-all cursor-pointer ${
+                  activeTab === 'LOCAL'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Email
+              </button>
+              <button
+                onClick={() => { setActiveTab('LDAP'); setError(''); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-[13px] font-medium transition-all cursor-pointer ${
+                  activeTab === 'LDAP'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Server className="h-3.5 w-3.5" />
+                Annuaire LDAP
+              </button>
             </div>
           )}
 
@@ -268,9 +301,15 @@ export default function LoginPage() {
               onSubmit={activeTab === 'LDAP' ? handleLdapSubmit : handleLocalSubmit}
               style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
             >
+              {activeTab === 'LDAP' && !hasMultipleCredentialMethods && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 border border-border">
+                  <Server className="h-3.5 w-3.5 shrink-0" />
+                  Connectez-vous avec vos identifiants d&apos;annuaire
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <Label htmlFor="email" style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>
-                  Email
+                  {activeTab === 'LDAP' ? 'Email LDAP' : 'Email'}
                 </Label>
                 <Input
                   id="email"
@@ -341,16 +380,20 @@ export default function LoginPage() {
 
           {/* Admin login fallback */}
           {!hasLocal && !showAdminLogin && (
-            <div className="flex mt-6">
-              <Button
-                variant="ghost"
-                onClick={() => { setShowAdminLogin(true); setActiveTab('LOCAL'); }}
-                className="text-muted-foreground hover:text-foreground gap-1.5 border-black cursor-pointer"
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => { setShowAdminLogin(true); setActiveTab('LOCAL'); setError(''); }}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
-                <Shield className="h-3 w-3" />
+                <Lock className="h-3 w-3" />
                 Connexion administrateur
-              </Button>
+              </button>
             </div>
+          )}
+          {showAdminLogin && !hasLocal && (
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              Réservé aux super-administrateurs de la plateforme
+            </p>
           )}
         </div>
       </div>
