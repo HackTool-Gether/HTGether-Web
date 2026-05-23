@@ -1043,7 +1043,38 @@ export default function ProjectReportPage() {
     setPdfLoading(true);
     try {
       const result = await templatesApi.render(selectedTemplateId, projectId, token);
-      const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${result.css}</style></head><body>${result.html}</body></html>`;
+      const previewStyles = `
+        @page { size: A4; margin: 0; }
+        html, body {
+          margin: 0;
+          padding: 0;
+          background: #525659;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        body {
+          padding: 32px 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 32px;
+        }
+        .page-sheet {
+          width: 210mm;
+          min-height: 297mm;
+          background: white;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1);
+          border-radius: 2px;
+          padding: 20mm 18mm;
+          box-sizing: border-box;
+          overflow: hidden;
+        }
+        @media print {
+          html, body { background: white; padding: 0; gap: 0; }
+          .page-sheet { box-shadow: none; border-radius: 0; width: auto; min-height: auto; padding: 0; margin: 0; }
+        }
+      `;
+      const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${previewStyles}\n.page-sheet { }\n${result.css}</style></head><body><div class="page-sheet">${result.html}</div></body></html>`;
       setPdfPreviewHtml(fullHtml);
       setShowPdfPreview(true);
     } catch (err) {
@@ -1080,6 +1111,7 @@ export default function ProjectReportPage() {
         slug: f.slug,
         severity: f.severity,
         status: f.status,
+        tags: f.tags,
       })),
     [findings],
   );
@@ -1376,7 +1408,7 @@ export default function ProjectReportPage() {
                   </Button>
                 </div>
               </div>
-              <div className="flex-1 overflow-auto bg-white rounded-b-xl">
+              <div className="flex-1 overflow-auto rounded-b-xl" style={{ background: '#525659' }}>
                 <iframe
                   srcDoc={pdfPreviewHtml}
                   className="w-full h-full border-0"

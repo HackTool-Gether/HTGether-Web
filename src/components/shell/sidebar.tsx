@@ -271,9 +271,14 @@ function ProjectTreeItem({ project, expanded, onToggle, pathname, token }: Proje
             active={pathname === base}
           />
           <ProjectNavItem
-            label="Findings"
-            href={`${base}/findings`}
-            active={pathname.startsWith(`${base}/findings`)}
+            label="Membres"
+            href={`${base}/members`}
+            active={pathname.startsWith(`${base}/members`)}
+          />
+          <ProjectNavItem
+            label="Attribution"
+            href={`${base}/workload`}
+            active={pathname.startsWith(`${base}/workload`)}
           />
           <ProjectNavItem
             label="Tâches"
@@ -281,9 +286,9 @@ function ProjectTreeItem({ project, expanded, onToggle, pathname, token }: Proje
             active={pathname.startsWith(`${base}/tasks`)}
           />
           <ProjectNavItem
-            label="Messages"
-            href={`${base}/messages`}
-            active={pathname.startsWith(`${base}/messages`)}
+            label="Findings"
+            href={`${base}/findings`}
+            active={pathname.startsWith(`${base}/findings`)}
           />
           <ProjectNavItem
             label="Chaînes d'attaque"
@@ -296,14 +301,9 @@ function ProjectTreeItem({ project, expanded, onToggle, pathname, token }: Proje
             active={pathname.startsWith(`${base}/report`)}
           />
           <ProjectNavItem
-            label="Attribution"
-            href={`${base}/workload`}
-            active={pathname.startsWith(`${base}/workload`)}
-          />
-          <ProjectNavItem
-            label="Membres"
-            href={`${base}/members`}
-            active={pathname.startsWith(`${base}/members`)}
+            label="Messages"
+            href={`${base}/messages`}
+            active={pathname.startsWith(`${base}/messages`)}
           />
           {scopes.length > 0 && (
             <>

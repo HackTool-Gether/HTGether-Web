@@ -118,10 +118,7 @@ export default function FindingsListPage() {
         { title: form.title, severity: form.severity },
         token
       );
-      setFindings((prev) => [created, ...prev]);
-      setSelected(created.id);
-      setShowCreate(false);
-      setForm({ title: '', severity: 'MEDIUM' });
+      router.push(`/dashboard/projects/${projectId}/findings/${created.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur');
     } finally {

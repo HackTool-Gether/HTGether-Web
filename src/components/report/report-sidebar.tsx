@@ -32,6 +32,7 @@ export interface SidebarFinding {
   slug?: string;
   severity: Severity;
   status: string;
+  tags?: string;
 }
 
 export type ActiveView =
@@ -90,14 +91,37 @@ export function ReportSidebar({
   const [sectionsOpen, setSectionsOpen] = useState(true);
   const [findingsOpen, setFindingsOpen] = useState(true);
   const [search, setSearch] = useState('');
+  const [activeTags, setActiveTags] = useState<string[]>([]);
 
-  const filteredFindings = search
-    ? findings.filter(
-        (f) =>
-          f.title.toLowerCase().includes(search.toLowerCase()) ||
-          (f.slug && f.slug.toLowerCase().includes(search.toLowerCase())),
-      )
-    : findings;
+  const allTags = Array.from(
+    new Set(
+      findings.flatMap((f) =>
+        f.tags ? f.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+      ),
+    ),
+  ).sort();
+
+  const toggleTag = (tag: string) => {
+    setActiveTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
+  };
+
+  const filteredFindings = findings.filter((f) => {
+    if (search) {
+      const q = search.toLowerCase();
+      const matchText =
+        f.title.toLowerCase().includes(q) ||
+        (f.slug && f.slug.toLowerCase().includes(q)) ||
+        (f.tags && f.tags.toLowerCase().includes(q));
+      if (!matchText) return false;
+    }
+    if (activeTags.length > 0) {
+      const fTags = f.tags ? f.tags.split(',').map((t) => t.trim()) : [];
+      if (!activeTags.some((t) => fTags.includes(t))) return false;
+    }
+    return true;
+  });
 
   return (
     <div
@@ -303,6 +327,55 @@ export function ReportSidebar({
                   }}
                 />
               </div>
+            </div>
+          )}
+
+          {/* Tag filters */}
+          {allTags.length > 0 && (
+            <div style={{ padding: '0 8px 6px', display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {allTags.map((tag) => {
+                const isActive = activeTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    style={{
+                      padding: '1px 6px',
+                      fontSize: 10,
+                      fontWeight: isActive ? 600 : 400,
+                      borderRadius: 999,
+                      border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+                      background: isActive ? 'var(--accent-tint)' : 'transparent',
+                      color: isActive ? 'var(--accent)' : 'var(--fg-subtle)',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-mono)',
+                      transition: 'all 0.1s',
+                    }}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+              {activeTags.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTags([])}
+                  style={{
+                    padding: '1px 6px',
+                    fontSize: 10,
+                    borderRadius: 999,
+                    border: 'none',
+                    background: 'none',
+                    color: 'var(--fg-subtle)',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  tout
+                </button>
+              )}
             </div>
           )}
 
