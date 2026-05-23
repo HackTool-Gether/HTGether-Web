@@ -1067,6 +1067,28 @@ export interface WorkloadData {
   scopes: WorkloadScope[];
 }
 
+export interface DashboardStats {
+  projects: { total: number; active: number };
+  findings: { open: number; bySeverity: Record<string, number> };
+  tasks: { total: number; done: number; inProgress: number };
+  users: { active: number };
+  recentFindings: {
+    id: string; title: string; severity: string;
+    projectName: string; projectId: string;
+    authorName: string; createdAt: string;
+  }[];
+  recentTasks: {
+    id: string; title: string;
+    projectName: string; projectId: string;
+    assigneeName: string | null; completedAt: string;
+  }[];
+}
+
+export const dashboardApi = {
+  getStats: (token: string) =>
+    apiRequest<DashboardStats>('/projects/dashboard-stats', { token }),
+};
+
 export const workloadApi = {
   get: (projectId: string, token: string) =>
     apiRequest<WorkloadData>(`/projects/${projectId}/workload`, { token }),
