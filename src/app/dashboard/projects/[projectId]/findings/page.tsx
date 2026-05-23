@@ -66,6 +66,7 @@ export default function FindingsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sev, setSev] = useState<'all' | Severity>('all');
+  const [authorFilter, setAuthorFilter] = useState<string>('all');
   const [selected, setSelected] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -128,7 +129,15 @@ export default function FindingsListPage() {
     }
   };
 
-  const filtered = sev === 'all' ? findings : findings.filter((f) => f.severity === sev);
+  const authors = Array.from(
+    new Map(findings.filter((f) => f.author).map((f) => [f.author!.id, f.author!])).values()
+  );
+
+  const filtered = findings.filter((f) => {
+    if (sev !== 'all' && f.severity !== sev) return false;
+    if (authorFilter !== 'all' && f.author?.id !== authorFilter) return false;
+    return true;
+  });
   const cur = findings.find((f) => f.id === selected) || null;
 
   if (loading) {
@@ -194,6 +203,22 @@ export default function FindingsListPage() {
               );
             })}
           </div>
+
+          {authors.length > 1 && (
+            <Select value={authorFilter} onValueChange={(v) => setAuthorFilter(v ?? 'all')}>
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Tous les membres" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les membres</SelectItem>
+                {authors.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.firstName} {a.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {error && (
