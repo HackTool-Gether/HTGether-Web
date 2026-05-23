@@ -3,16 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { templatesApi, ApiError, type ReportTemplate, type TemplateVariable } from '@/lib/api';
+import { templatesApi, ApiError, type ReportTemplate, type TemplateVariable, type TemplateAssetData } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
   Loader2, ArrowLeft, Save, Eye, EyeOff, Code, Palette, Variable,
   Plus, Trash2, GripVertical, ChevronDown, ChevronRight, HelpCircle,
+  ImageIcon, Upload, Copy, X,
 } from 'lucide-react';
 
-type EditorTab = 'html' | 'css' | 'variables';
+type EditorTab = 'html' | 'css' | 'variables' | 'assets';
 
 const VARIABLE_TYPES = [
   { value: 'string', label: 'Texte' },
@@ -75,6 +76,10 @@ export default function TemplateDesignerPage() {
   const [expandedVarId, setExpandedVarId] = useState<string | null>(null);
   const [showAutoVars, setShowAutoVars] = useState(false);
 
+  const [assets, setAssets] = useState<TemplateAssetData[]>([]);
+  const [uploadingAsset, setUploadingAsset] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const htmlRef = useRef<HTMLTextAreaElement>(null);
   const cssRef = useRef<HTMLTextAreaElement>(null);
@@ -97,7 +102,44 @@ export default function TemplateDesignerPage() {
     }
   }, [token, templateId]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadAssets = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await templatesApi.getAssets(templateId, token);
+      setAssets(data);
+    } catch { /* ignore */ }
+  }, [token, templateId]);
+
+  useEffect(() => { load(); loadAssets(); }, [load, loadAssets]);
+
+  const handleUploadAsset = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !token) return;
+    setUploadingAsset(true);
+    try {
+      const asset = await templatesApi.uploadAsset(templateId, file, token);
+      setAssets((prev) => [...prev, asset]);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur upload');
+    } finally {
+      setUploadingAsset(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteAsset = async (assetId: string) => {
+    if (!token) return;
+    try {
+      await templatesApi.removeAsset(assetId, token);
+      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur suppression');
+    }
+  };
+
+  const copyAssetPath = (path: string) => {
+    navigator.clipboard.writeText(path);
+  };
 
   const handleSave = useCallback(async () => {
     if (!token || !template) return;
@@ -320,6 +362,7 @@ export default function TemplateDesignerPage() {
               { key: 'html' as const, icon: Code, label: 'HTML' },
               { key: 'css' as const, icon: Palette, label: 'CSS' },
               { key: 'variables' as const, icon: Variable, label: 'Variables' },
+              { key: 'assets' as const, icon: ImageIcon, label: `Assets${assets.length ? ` (${assets.length})` : ''}` },
             ]).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -603,6 +646,83 @@ export default function TemplateDesignerPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'assets' && (
+              <div className="h-full overflow-auto p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-medium">Assets du template</h3>
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,.svg,.pdf"
+                      onChange={handleUploadAsset}
+                      className="hidden"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5 text-xs"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingAsset}
+                    >
+                      {uploadingAsset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      Uploader
+                    </Button>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground">
+                  Uploadez des images (logos, icônes) pour les utiliser dans votre template via leur chemin.
+                </p>
+
+                {assets.length === 0 ? (
+                  <div className="flex flex-col items-center py-8 text-muted-foreground">
+                    <ImageIcon className="h-8 w-8 opacity-20 mb-2" />
+                    <p className="text-xs">Aucun asset</p>
+                    <p className="text-[10px] opacity-60 mt-0.5">Uploadez des images pour les utiliser dans le template</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {assets.map((asset) => (
+                      <div key={asset.id} className="rounded-lg border border-border overflow-hidden group">
+                        {asset.type.startsWith('image/') ? (
+                          <div className="h-24 bg-muted/30 flex items-center justify-center overflow-hidden">
+                            <img
+                              src={asset.filePath}
+                              alt={asset.fileName}
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-24 bg-muted/30 flex items-center justify-center">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+                          </div>
+                        )}
+                        <div className="px-2.5 py-2 border-t border-border">
+                          <p className="text-[11px] font-medium truncate">{asset.fileName}</p>
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <button
+                              onClick={() => copyAssetPath(asset.filePath)}
+                              className="flex items-center gap-1 text-[10px] text-accent hover:underline"
+                              title="Copier le chemin"
+                            >
+                              <Copy className="h-3 w-3" /> Copier le chemin
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAsset(asset.id)}
+                              className="flex items-center gap-1 text-[10px] text-destructive hover:underline ml-auto"
+                            >
+                              <X className="h-3 w-3" /> Supprimer
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

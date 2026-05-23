@@ -614,6 +614,30 @@ export const templatesApi = {
 
   render: (templateId: string, projectId: string, token: string) =>
     apiRequest<RenderResult>(`/templates/${templateId}/render/${projectId}`, { token }),
+
+  getAssets: (templateId: string, token: string) =>
+    apiRequest<TemplateAssetData[]>(`/templates/${templateId}/assets`, { token }),
+
+  uploadAsset: async (templateId: string, file: File, token: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/templates/${templateId}/assets`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: 'Upload failed' }));
+      throw new ApiError(error.message || 'Upload failed', res.status);
+    }
+    return res.json() as Promise<TemplateAssetData>;
+  },
+
+  removeAsset: (assetId: string, token: string) =>
+    apiRequest<{ message: string }>(`/templates/assets/${assetId}`, {
+      method: 'DELETE',
+      token,
+    }),
 };
 
 // Reports API
