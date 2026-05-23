@@ -300,6 +300,64 @@ export const scopesApi = {
     }),
 };
 
+// Components API
+export type ComponentStatus = 'COMPLIANT' | 'REMARK' | 'VULNERABLE' | 'UNTESTED';
+
+export interface ComponentData {
+  id: string;
+  name: string;
+  type?: string;
+  status: ComponentStatus;
+  description?: string;
+  scopeId: string;
+  _count?: { findings: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComponentStats {
+  status: ComponentStatus;
+  _count: number;
+}
+
+export const componentsApi = {
+  getAllByScope: (scopeId: string, token: string) =>
+    apiRequest<ComponentData[]>(`/scopes/${scopeId}/components`, { token }),
+
+  getOne: (scopeId: string, componentId: string, token: string) =>
+    apiRequest<ComponentData>(`/scopes/${scopeId}/components/${componentId}`, { token }),
+
+  create: (scopeId: string, data: { name: string; type?: string; description?: string }, token: string) =>
+    apiRequest<ComponentData>(`/scopes/${scopeId}/components`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  update: (scopeId: string, componentId: string, data: Partial<{ name: string; type: string; description: string; status: string }>, token: string) =>
+    apiRequest<ComponentData>(`/scopes/${scopeId}/components/${componentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateStatus: (scopeId: string, componentId: string, status: ComponentStatus, token: string) =>
+    apiRequest<ComponentData>(`/scopes/${scopeId}/components/${componentId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+      token,
+    }),
+
+  remove: (scopeId: string, componentId: string, token: string) =>
+    apiRequest<void>(`/scopes/${scopeId}/components/${componentId}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  getStats: (scopeId: string, token: string) =>
+    apiRequest<ComponentStats[]>(`/scopes/${scopeId}/components/stats`, { token }),
+};
+
 // Findings API
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 export type FindingStatus = 'DRAFT' | 'CONFIRMED' | 'FALSE_POSITIVE' | 'FIXED';
