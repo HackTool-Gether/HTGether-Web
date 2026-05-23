@@ -1084,6 +1084,54 @@ export const workloadApi = {
     }),
 };
 
+// ── Attack chains ──
+
+export interface AttackChainFinding {
+  id: string;
+  order: number;
+  finding: { id: string; title: string; severity: string; slug: string | null; status: string; description?: string };
+}
+
+export interface AttackChain {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  findings: AttackChainFinding[];
+}
+
+export const attackChainsApi = {
+  getAll: (projectId: string, token: string) =>
+    apiRequest<AttackChain[]>(`/projects/${projectId}/attack-chains`, { token }),
+
+  create: (projectId: string, data: { name: string; description?: string }, token: string) =>
+    apiRequest<AttackChain>(`/projects/${projectId}/attack-chains`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getOne: (id: string, token: string) =>
+    apiRequest<AttackChain>(`/attack-chains/${id}`, { token }),
+
+  update: (id: string, data: { name?: string; description?: string }, token: string) =>
+    apiRequest<AttackChain>(`/attack-chains/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (id: string, token: string) =>
+    apiRequest<void>(`/attack-chains/${id}`, { method: 'DELETE', token }),
+
+  setFindings: (id: string, findingIds: string[], token: string) =>
+    apiRequest<AttackChain>(`/attack-chains/${id}/findings`, {
+      method: 'PUT',
+      body: JSON.stringify({ findingIds }),
+      token,
+    }),
+};
+
 export const remarksApi = {
   getAll: (projectId: string, token: string) =>
     apiRequest<ProjectRemark[]>(`/projects/${projectId}/remarks`, { token }),
