@@ -288,7 +288,7 @@ export default function SetupPage() {
     setLoading(true);
     setError('');
     const data: OnboardingData = {
-      admin: { email: admin.email, password: admin.password, firstName: admin.firstName, lastName: admin.lastName },
+      ...(admin.email ? { admin: { email: admin.email, password: admin.password, firstName: admin.firstName, lastName: admin.lastName } } : {}),
       company: { name: company.name, domain: company.domain || undefined },
       auth: { providers: Object.entries(authProviders).map(([type, { enabled, config }]) => ({ type, enabled, config })) },
       ai: { enabled: ai.enabled, provider: ai.provider || undefined, apiKey: ai.apiKey || undefined, model: ai.model || undefined },
