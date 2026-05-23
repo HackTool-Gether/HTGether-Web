@@ -999,3 +999,72 @@ export interface OnboardingData {
     domain?: string;
   };
 }
+
+// ── Project remarks & stats ──
+
+export interface ProjectRemark {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  author: { id: string; firstName: string; lastName: string };
+}
+
+export interface ProjectStats {
+  scopes: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    notStarted: number;
+    inReview: number;
+    completionPercent: number;
+  };
+  findings: {
+    total: number;
+    bySeverity: Record<string, number>;
+    byStatus: Record<string, number>;
+    byAuthor: { userId: string; name: string; count: number }[];
+  };
+  tasks: {
+    total: number;
+    byStatus: Record<string, number>;
+    byMember: { memberId: string; name: string; total: number; done: number }[];
+    completionPercent: number;
+  };
+  timeline: {
+    startDate: string;
+    endDate: string;
+    daysTotal: number;
+    daysElapsed: number;
+    progressPercent: number;
+    isLate: boolean;
+  };
+  alerts: {
+    isLate: boolean;
+    stalledScopes: string[];
+    unconfirmedFindings: number;
+  };
+}
+
+export const remarksApi = {
+  getAll: (projectId: string, token: string) =>
+    apiRequest<ProjectRemark[]>(`/projects/${projectId}/remarks`, { token }),
+
+  create: (projectId: string, content: string, token: string) =>
+    apiRequest<ProjectRemark>(`/projects/${projectId}/remarks`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+      token,
+    }),
+
+  remove: (projectId: string, remarkId: string, token: string) =>
+    apiRequest<void>(`/projects/${projectId}/remarks/${remarkId}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
+export const statsApi = {
+  getProjectStats: (projectId: string, token: string) =>
+    apiRequest<ProjectStats>(`/projects/${projectId}/stats`, { token }),
+};
