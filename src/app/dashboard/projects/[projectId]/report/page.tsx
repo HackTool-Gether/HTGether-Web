@@ -9,10 +9,12 @@ import {
   reportsApi,
   projectsApi,
   findingsApi,
+  attackChainsApi,
   templatesApi,
   ApiError,
   type ProjectDetail,
   type Finding,
+  type AttackChain,
   type Report,
   type ReportTemplate,
   type Severity,
@@ -38,15 +40,17 @@ import {
   Sparkles,
   FileText,
   ShieldAlert,
-  Save,
   Download,
   Eye,
   ChevronDown,
+  ChevronUp,
   X,
   Copy,
   Check,
   Plus,
   Trash2,
+  Link2,
+  ArrowRight,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -103,6 +107,8 @@ const PREDEFINED_SECTIONS: Omit<ReportSection, 'id'>[] = [
   { type: 'executive_summary', title: 'Synthèse exécutive', content: null, predefined: true },
   { type: 'scope', title: 'Périmètre', content: null, predefined: true },
   { type: 'methodology', title: 'Méthodologie', content: null, predefined: true },
+  { type: 'findings', title: 'Vulnérabilités', content: null, predefined: false },
+  { type: 'attack_chains', title: 'Chaînes d\'attaque', content: null, predefined: false },
   { type: 'recommendations', title: 'Recommandations', content: null, predefined: true },
   { type: 'conclusion', title: 'Conclusion', content: null, predefined: true },
 ];
@@ -117,7 +123,23 @@ function migrateContent(raw: any, findings: Finding[]): ReportDataV3 {
   if (!raw) return makeDefault(findings);
 
   if (raw.version === 3 && Array.isArray(raw.sections)) {
-    return raw as ReportDataV3;
+    const data = raw as ReportDataV3;
+    const sections = [...data.sections];
+    if (!sections.some((s) => s.type === 'findings')) {
+      const recIdx = sections.findIndex((s) => s.type === 'recommendations');
+      const insertIdx = recIdx !== -1 ? recIdx : sections.length;
+      sections.splice(insertIdx, 0, {
+        id: uid(), type: 'findings', title: 'Vulnérabilités', content: null, predefined: false,
+      });
+    }
+    if (!sections.some((s) => s.type === 'attack_chains')) {
+      const findingsIdx = sections.findIndex((s) => s.type === 'findings');
+      const insertIdx = findingsIdx !== -1 ? findingsIdx + 1 : sections.length;
+      sections.splice(insertIdx, 0, {
+        id: uid(), type: 'attack_chains', title: 'Chaînes d\'attaque', content: null, predefined: false,
+      });
+    }
+    return { ...data, sections };
   }
 
   if (raw.version === 2 && Array.isArray(raw.blocks)) {
@@ -702,6 +724,383 @@ function FindingsSummaryTable({ findings }: { findings: Finding[] }) {
   );
 }
 
+// ── Attack chains editor ───────────────────────────────────────────────
+
+const CHAIN_SEV_COLORS: Record<string, { bg: string; fg: string }> = {
+  CRITICAL: { bg: 'oklch(0.65 0.2 25 / 0.15)', fg: 'oklch(0.65 0.2 25)' },
+  HIGH: { bg: 'oklch(0.7 0.15 40 / 0.15)', fg: 'oklch(0.7 0.15 40)' },
+  MEDIUM: { bg: 'oklch(0.75 0.15 80 / 0.15)', fg: 'oklch(0.65 0.15 80)' },
+  LOW: { bg: 'oklch(0.6 0.12 250 / 0.15)', fg: 'oklch(0.6 0.12 250)' },
+  INFO: { bg: 'oklch(0.6 0.05 250 / 0.15)', fg: 'oklch(0.5 0.05 250)' },
+};
+
+function AttackChainsEditor({
+  projectId,
+  token,
+  allFindings,
+}: {
+  projectId: string;
+  token: string;
+  allFindings: Finding[];
+}) {
+  const [chains, setChains] = useState<AttackChain[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    attackChainsApi.getAll(projectId, token)
+      .then((c) => { if (mounted) setChains(c); })
+      .catch(() => { if (mounted) setError('Impossible de charger les chaînes'); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [projectId, token]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const chain = await attackChainsApi.create(projectId, { name: newName.trim() }, token);
+      setNewName('');
+      setChains((prev) => [chain, ...prev]);
+      setExpanded(chain.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await attackChainsApi.remove(id, token);
+      setChains((prev) => prev.filter((c) => c.id !== id));
+      if (expanded === id) setExpanded(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    }
+  };
+
+  const handleAddFinding = async (chainId: string, findingId: string) => {
+    const chain = chains.find((c) => c.id === chainId);
+    if (!chain) return;
+    const currentIds = chain.findings.map((f) => f.finding.id);
+    if (currentIds.includes(findingId)) return;
+    try {
+      const updated = await attackChainsApi.setFindings(chainId, [...currentIds, findingId], token);
+      setChains((prev) => prev.map((c) => (c.id === chainId ? updated : c)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    }
+  };
+
+  const handleRemoveFinding = async (chainId: string, findingId: string) => {
+    const chain = chains.find((c) => c.id === chainId);
+    if (!chain) return;
+    const newIds = chain.findings.filter((f) => f.finding.id !== findingId).map((f) => f.finding.id);
+    try {
+      const updated = await attackChainsApi.setFindings(chainId, newIds, token);
+      setChains((prev) => prev.map((c) => (c.id === chainId ? updated : c)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    }
+  };
+
+  const handleMoveFinding = async (chainId: string, findingId: string, direction: 'up' | 'down') => {
+    const chain = chains.find((c) => c.id === chainId);
+    if (!chain) return;
+    const ids = chain.findings.map((f) => f.finding.id);
+    const idx = ids.indexOf(findingId);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= ids.length) return;
+    [ids[idx], ids[swapIdx]] = [ids[swapIdx], ids[idx]];
+    try {
+      const updated = await attackChainsApi.setFindings(chainId, ids, token);
+      setChains((prev) => prev.map((c) => (c.id === chainId ? updated : c)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: 'var(--fg-subtle)', fontSize: 11 }}>
+        <Link2 size={12} />
+        Chaînes d&apos;attaque
+      </div>
+      <h2 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 20 }}>
+        Chaînes d&apos;attaque
+      </h2>
+
+      {error && (
+        <div style={{ padding: '8px 12px', marginBottom: 12, borderRadius: 'var(--r-md)', background: 'var(--sev-critical-fg-bg, oklch(0.65 0.2 25 / 0.1))', color: 'var(--sev-critical-fg)', fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Create form */}
+      <form onSubmit={handleCreate} style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <input
+          placeholder="Nom de la chaîne (ex: Élévation de privilèges via SSRF)"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          style={{
+            flex: 1, padding: '8px 12px', fontSize: 13,
+            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-md)', color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
+          }}
+        />
+        <Button type="submit" size="sm" disabled={creating || !newName.trim()}>
+          {creating ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Plus className="mr-1 h-3 w-3" />}
+          Créer
+        </Button>
+      </form>
+
+      {chains.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-subtle)' }}>
+          <Link2 size={32} style={{ margin: '0 auto 12px', opacity: 0.2 }} />
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>Aucune chaîne d&apos;attaque</div>
+          <div style={{ fontSize: 12, marginTop: 4, opacity: 0.6 }}>
+            Créez des chaînes pour documenter les scénarios d&apos;exploitation multi-étapes
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {chains.map((chain) => {
+            const isExpanded = expanded === chain.id;
+            const usedFindingIds = new Set(chain.findings.map((f) => f.finding.id));
+            const availableFindings = allFindings.filter((f) => !usedFindingIds.has(f.id));
+
+            return (
+              <div
+                key={chain.id}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-lg)',
+                  overflow: 'hidden',
+                  background: 'var(--bg-elevated)',
+                }}
+              >
+                {/* Header */}
+                <div
+                  onClick={() => setExpanded(isExpanded ? null : chain.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 16px', cursor: 'pointer',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-subtle)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{chain.name}</div>
+                    {chain.description && (
+                      <div style={{ fontSize: 12, color: 'var(--fg-subtle)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {chain.description}
+                      </div>
+                    )}
+                  </div>
+                  <span className="font-mono" style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>
+                    {chain.findings.length} étape{chain.findings.length > 1 ? 's' : ''}
+                  </span>
+                  {chain.findings.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      {chain.findings.map((f, i) => (
+                        <span key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <span
+                            style={{
+                              width: 8, height: 8, borderRadius: '50%',
+                              background: CHAIN_SEV_COLORS[f.finding.severity]?.fg || 'var(--fg-subtle)',
+                            }}
+                            title={`${f.finding.title} (${f.finding.severity})`}
+                          />
+                          {i < chain.findings.length - 1 && <ArrowRight size={8} style={{ color: 'var(--fg-subtle)' }} />}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(chain.id); }}
+                    style={{
+                      background: 'none', border: 'none', padding: 4, cursor: 'pointer',
+                      color: 'var(--fg-subtle)', display: 'flex', flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--sev-critical-fg)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-subtle)'; }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                {/* Expanded content */}
+                {isExpanded && (
+                  <div style={{ borderTop: '1px solid var(--border)', padding: 16 }}>
+                    {chain.findings.length > 0 ? (
+                      <div>
+                        {chain.findings.map((step, idx) => {
+                          const sev = CHAIN_SEV_COLORS[step.finding.severity] || { bg: 'var(--bg-subtle)', fg: 'var(--fg)' };
+                          return (
+                            <div key={step.id}>
+                              <div style={{ display: 'flex', gap: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 28, flexShrink: 0 }}>
+                                  <div style={{
+                                    width: 24, height: 24, borderRadius: '50%',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 10, fontWeight: 700,
+                                    background: sev.bg, color: sev.fg, border: `1.5px solid ${sev.fg}`,
+                                  }}>
+                                    {idx + 1}
+                                  </div>
+                                  {idx < chain.findings.length - 1 && (
+                                    <div style={{ flex: 1, width: 1, margin: '4px 0', background: 'var(--border)' }} />
+                                  )}
+                                </div>
+                                <div
+                                  className="group"
+                                  style={{
+                                    flex: 1, padding: '8px 12px', marginBottom: 8,
+                                    border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        {step.finding.slug && (
+                                          <span className="font-mono" style={{ fontSize: 10, color: 'var(--fg-subtle)' }}>{step.finding.slug}</span>
+                                        )}
+                                        <span style={{
+                                          fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+                                          padding: '1px 5px', borderRadius: 4,
+                                          background: sev.bg, color: sev.fg,
+                                        }}>
+                                          {step.finding.severity}
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2 }}>{step.finding.title}</div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 0.1s', flexShrink: 0 }} className="group-hover:!opacity-100">
+                                      <button
+                                        disabled={idx === 0}
+                                        onClick={() => handleMoveFinding(chain.id, step.finding.id, 'up')}
+                                        style={{ background: 'none', border: 'none', padding: 4, cursor: idx === 0 ? 'default' : 'pointer', color: 'var(--fg-subtle)', opacity: idx === 0 ? 0.3 : 1, display: 'flex' }}
+                                      >
+                                        <ChevronUp size={14} />
+                                      </button>
+                                      <button
+                                        disabled={idx === chain.findings.length - 1}
+                                        onClick={() => handleMoveFinding(chain.id, step.finding.id, 'down')}
+                                        style={{ background: 'none', border: 'none', padding: 4, cursor: idx === chain.findings.length - 1 ? 'default' : 'pointer', color: 'var(--fg-subtle)', opacity: idx === chain.findings.length - 1 ? 0.3 : 1, display: 'flex' }}
+                                      >
+                                        <ChevronDown size={14} />
+                                      </button>
+                                      <button
+                                        onClick={() => handleRemoveFinding(chain.id, step.finding.id)}
+                                        style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--fg-subtle)', display: 'flex' }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--sev-critical-fg)'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-subtle)'; }}
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 12, color: 'var(--fg-subtle)' }}>
+                        Aucune étape. Ajoutez des findings pour construire la chaîne.
+                      </div>
+                    )}
+
+                    <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+                      {showPicker === chain.id ? (
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: 500 }}>Ajouter un finding</span>
+                            <button
+                              onClick={() => setShowPicker(null)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-subtle)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
+                            >
+                              <X size={12} /> Fermer
+                            </button>
+                          </div>
+                          {availableFindings.length === 0 ? (
+                            <div style={{ fontSize: 12, color: 'var(--fg-subtle)', textAlign: 'center', padding: 8 }}>
+                              Tous les findings sont déjà dans cette chaîne
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+                              {availableFindings.map((f) => {
+                                const sev = CHAIN_SEV_COLORS[f.severity] || { bg: 'var(--bg-subtle)', fg: 'var(--fg)' };
+                                return (
+                                  <button
+                                    key={f.id}
+                                    type="button"
+                                    onClick={() => handleAddFinding(chain.id, f.id)}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: 8,
+                                      padding: '6px 10px', border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r-md)', background: 'transparent',
+                                      cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                                      transition: 'background 0.1s',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-subtle)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                  >
+                                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', padding: '1px 5px', borderRadius: 4, background: sev.bg, color: sev.fg, flexShrink: 0 }}>
+                                      {f.severity}
+                                    </span>
+                                    <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--fg)' }}>
+                                      {f.title}
+                                    </span>
+                                    {f.slug && (
+                                      <span className="font-mono" style={{ fontSize: 10, color: 'var(--fg-subtle)', flexShrink: 0 }}>{f.slug}</span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setShowPicker(chain.id)}
+                        >
+                          <Plus className="mr-1 h-3 w-3" /> Ajouter un finding
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Empty state ─────────────────────────────────────────────────────────
 
 function EmptyState({ onGenerate, findingsCount }: { onGenerate: () => void; findingsCount: number }) {
@@ -899,14 +1298,15 @@ export default function ProjectReportPage() {
     [scheduleSaveReport, findingOrder],
   );
 
-  const addSection = useCallback(() => {
-    const sec: ReportSection = {
-      id: uid(),
-      type: 'custom',
-      title: 'Nouvelle section',
-      content: null,
-      predefined: false,
-    };
+  const addSection = useCallback((type?: string) => {
+    let sec: ReportSection;
+    if (type === 'findings') {
+      sec = { id: uid(), type: 'findings', title: 'Vulnérabilités', content: null, predefined: false };
+    } else if (type === 'attack_chains') {
+      sec = { id: uid(), type: 'attack_chains', title: 'Chaînes d\'attaque', content: null, predefined: false };
+    } else {
+      sec = { id: uid(), type: 'custom', title: 'Nouvelle section', content: null, predefined: false };
+    }
     const next = [...sections, sec];
     updateSections(next);
     setActiveView({ kind: 'section', id: sec.id });
@@ -914,9 +1314,13 @@ export default function ProjectReportPage() {
 
   const deleteSection = useCallback(
     (id: string) => {
+      const deletedSection = sections.find((s) => s.id === id);
       const next = sections.filter((s) => s.id !== id);
       updateSections(next);
-      if (activeView?.kind === 'section' && activeView.id === id) {
+      const shouldReset =
+        (activeView?.kind === 'section' && activeView.id === id) ||
+        (activeView?.kind === 'finding' && deletedSection?.type === 'findings');
+      if (shouldReset) {
         setActiveView(next.length > 0 ? { kind: 'section', id: next[0].id } : null);
       }
     },
@@ -1350,6 +1754,19 @@ export default function ProjectReportPage() {
           <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
             {sections.length === 0 && findings.length === 0 ? (
               <EmptyState onGenerate={handleInitialize} findingsCount={findings.length} />
+            ) : activeSection?.type === 'findings' ? (
+              <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: 'var(--fg-subtle)', fontSize: 11 }}>
+                  <ShieldAlert size={12} />
+                  Tableau des vulnérabilités
+                </div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 20 }}>
+                  Vulnérabilités
+                </h2>
+                <FindingsSummaryTable findings={findings} />
+              </div>
+            ) : activeSection?.type === 'attack_chains' ? (
+              <AttackChainsEditor projectId={projectId} token={token!} allFindings={findings} />
             ) : activeSection ? (
               <SectionEditor
                 section={activeSection}

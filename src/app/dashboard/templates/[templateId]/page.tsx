@@ -178,7 +178,24 @@ export default function TemplateDesignerPage() {
         setDirty(false);
       }
       const result = await templatesApi.preview(templateId, token);
-      const fullHtml = `<!DOCTYPE html><html><head><style>${result.css}</style></head><body>${result.html}</body></html>`;
+      const previewStyles = `
+        @page { size: A4; margin: 0; }
+        html, body {
+          margin: 0; padding: 0; background: #525659;
+          -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+        body { padding: 32px 0; display: flex; flex-direction: column; align-items: center; gap: 32px; }
+        .page-sheet {
+          width: 210mm; min-height: 297mm; background: white;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1);
+          border-radius: 2px; padding: 20mm 18mm; box-sizing: border-box; overflow: hidden;
+        }
+        @media print {
+          html, body { background: white; padding: 0; gap: 0; }
+          .page-sheet { box-shadow: none; border-radius: 0; width: auto; min-height: auto; padding: 0; margin: 0; }
+        }
+      `;
+      const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${previewStyles}\n${result.css}</style></head><body><div class="page-sheet">${result.html}</div></body></html>`;
       setPreviewHtml(fullHtml);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur preview');
@@ -749,7 +766,7 @@ export default function TemplateDesignerPage() {
                   Rafraîchir
                 </Button>
               </div>
-              <div className="flex-1 overflow-auto bg-white">
+              <div className="flex-1 overflow-auto" style={{ background: '#525659' }}>
                 {previewLoading && !previewHtml ? (
                   <div className="flex items-center justify-center h-full">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
