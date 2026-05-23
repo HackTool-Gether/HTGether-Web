@@ -51,6 +51,7 @@ import {
   Trash2,
   Link2,
   ArrowRight,
+  Zap,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -108,6 +109,7 @@ const PREDEFINED_SECTIONS: Omit<ReportSection, 'id'>[] = [
   { type: 'scope', title: 'Périmètre', content: null, predefined: true },
   { type: 'methodology', title: 'Méthodologie', content: null, predefined: true },
   { type: 'findings', title: 'Vulnérabilités', content: null, predefined: false },
+  { type: 'impacts', title: 'Impacts', content: null, predefined: false },
   { type: 'attack_chains', title: 'Chaînes d\'attaque', content: null, predefined: false },
   { type: 'recommendations', title: 'Recommandations', content: null, predefined: true },
   { type: 'conclusion', title: 'Conclusion', content: null, predefined: true },
@@ -132,9 +134,16 @@ function migrateContent(raw: any, findings: Finding[]): ReportDataV3 {
         id: uid(), type: 'findings', title: 'Vulnérabilités', content: null, predefined: false,
       });
     }
-    if (!sections.some((s) => s.type === 'attack_chains')) {
+    if (!sections.some((s) => s.type === 'impacts')) {
       const findingsIdx = sections.findIndex((s) => s.type === 'findings');
       const insertIdx = findingsIdx !== -1 ? findingsIdx + 1 : sections.length;
+      sections.splice(insertIdx, 0, {
+        id: uid(), type: 'impacts', title: 'Impacts', content: null, predefined: false,
+      });
+    }
+    if (!sections.some((s) => s.type === 'attack_chains')) {
+      const impactsIdx = sections.findIndex((s) => s.type === 'impacts');
+      const insertIdx = impactsIdx !== -1 ? impactsIdx + 1 : sections.length;
       sections.splice(insertIdx, 0, {
         id: uid(), type: 'attack_chains', title: 'Chaînes d\'attaque', content: null, predefined: false,
       });
@@ -466,12 +475,16 @@ function SectionEditor({
   onContentChange,
   extraExtensions,
   extraSlashItems,
+  contentKey,
+  actions,
 }: {
   section: ReportSection;
   onTitleChange: (title: string) => void;
   onContentChange: (raw: string) => void;
   extraExtensions: any[];
   extraSlashItems: any[];
+  contentKey?: number;
+  actions?: React.ReactNode;
 }) {
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
@@ -514,6 +527,8 @@ function SectionEditor({
         }}
       />
 
+      {actions}
+
       <div
         style={{
           padding: '20px 24px',
@@ -523,7 +538,7 @@ function SectionEditor({
         }}
       >
         <RichTextEditor
-          key={section.id}
+          key={`${section.id}-${contentKey || 0}`}
           content={section.content ? JSON.stringify(section.content) : ''}
           onChange={onContentChange}
           storageMode="json"
@@ -722,6 +737,166 @@ function FindingsSummaryTable({ findings }: { findings: Finding[] }) {
       </div>
     </div>
   );
+}
+
+// ── Impacts summary view ───────────────────────────────────────────────
+
+function ImpactsSummaryView({ findings }: { findings: Finding[] }) {
+  const withImpact = findings.filter((f) => f.impact);
+  const sorted = [...withImpact].sort(
+    (a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity),
+  );
+
+  const groups = SEV_ORDER.map((sev) => ({
+    severity: sev,
+    label: SEV_LABEL[sev],
+    color: SEV_COLOR[sev],
+    findings: sorted.filter((f) => f.severity === sev),
+  })).filter((g) => g.findings.length > 0);
+
+  const copyText = groups
+    .map(
+      (g) =>
+        `### ${g.label}\n\n` +
+        g.findings
+          .map((f) => `**${f.title}**${f.slug ? ` (${f.slug})` : ''}\n${toText(f.impact)}`)
+          .join('\n\n'),
+    )
+    .join('\n\n');
+
+  if (sorted.length === 0) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center', color: 'var(--fg-subtle)', fontSize: 13 }}>
+        Aucun impact renseigné dans les findings
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <CopyBtn text={copyText} label="Copier tout" />
+      </div>
+      {groups.map((group) => (
+        <div key={group.severity} style={{ marginBottom: 28 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 12,
+              paddingBottom: 8,
+              borderBottom: `2px solid color-mix(in oklch, ${group.color} 30%, transparent)`,
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '3px 10px',
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: group.color,
+                background: `color-mix(in oklch, ${group.color} 12%, transparent)`,
+              }}
+            >
+              {group.label}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--fg-subtle)' }}>
+              {group.findings.length} finding{group.findings.length > 1 ? 's' : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {group.findings.map((f) => (
+              <div
+                key={f.id}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: 'var(--r-md)',
+                  border: '1px solid var(--border)',
+                  borderLeft: `3px solid ${group.color}`,
+                  background: 'var(--bg-elevated)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{f.title}</span>
+                  {f.slug && (
+                    <span className="font-mono" style={{ fontSize: 10, color: 'var(--fg-subtle)' }}>
+                      {f.slug}
+                    </span>
+                  )}
+                  {f.cvssScore != null && (
+                    <span className="font-mono" style={{ fontSize: 11, color: group.color, marginLeft: 'auto' }}>
+                      CVSS {f.cvssScore.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--fg-muted)', whiteSpace: 'pre-wrap' }}>
+                  {toText(f.impact)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Recommendations generator ──────────────────────────────────────────
+
+function buildRecommendationsContent(findings: Finding[]): any {
+  const sevLabel: Record<string, string> = {
+    CRITICAL: 'Critiques',
+    HIGH: 'Hautes',
+    MEDIUM: 'Moyennes',
+    LOW: 'Basses',
+    INFO: 'Informatives',
+  };
+
+  const doc: any = { type: 'doc', content: [] };
+
+  for (const sev of SEV_ORDER) {
+    const sevFindings = findings.filter(
+      (f) => f.severity === sev && f.remediation && toText(f.remediation),
+    );
+    if (sevFindings.length === 0) continue;
+
+    doc.content.push({
+      type: 'heading',
+      attrs: { level: 3 },
+      content: [{ type: 'text', text: `Recommandations ${sevLabel[sev]}` }],
+    });
+
+    for (const f of sevFindings) {
+      const remText = toText(f.remediation);
+
+      doc.content.push({
+        type: 'paragraph',
+        content: [
+          { type: 'text', marks: [{ type: 'bold' }], text: f.title },
+          ...(f.slug ? [{ type: 'text', text: ` (${f.slug})` }] : []),
+        ],
+      });
+
+      doc.content.push({
+        type: 'paragraph',
+        content: [{ type: 'text', text: remText }],
+      });
+    }
+  }
+
+  if (doc.content.length === 0) {
+    doc.content.push({
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Aucune remédiation renseignée dans les findings.' }],
+    });
+  }
+
+  return doc;
 }
 
 // ── Attack chains editor ───────────────────────────────────────────────
@@ -1156,6 +1331,7 @@ export default function ProjectReportPage() {
   const [error, setError] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [creatingReport, setCreatingReport] = useState(false);
+  const [contentVersion, setContentVersion] = useState(0);
 
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -1302,6 +1478,8 @@ export default function ProjectReportPage() {
     let sec: ReportSection;
     if (type === 'findings') {
       sec = { id: uid(), type: 'findings', title: 'Vulnérabilités', content: null, predefined: false };
+    } else if (type === 'impacts') {
+      sec = { id: uid(), type: 'impacts', title: 'Impacts', content: null, predefined: false };
     } else if (type === 'attack_chains') {
       sec = { id: uid(), type: 'attack_chains', title: 'Chaînes d\'attaque', content: null, predefined: false };
     } else {
@@ -1366,6 +1544,18 @@ export default function ProjectReportPage() {
       scheduleSaveFinding(findingId, { [field]: value });
     },
     [scheduleSaveFinding],
+  );
+
+  // ── Generate recommendations from findings ──
+
+  const handleGenerateRecommendations = useCallback(
+    (sectionId: string) => {
+      const content = buildRecommendationsContent(findings);
+      const next = sections.map((s) => (s.id === sectionId ? { ...s, content } : s));
+      updateSections(next);
+      setContentVersion((v) => v + 1);
+    },
+    [findings, sections, updateSections],
   );
 
   // ── Initialize report ──
@@ -1765,6 +1955,17 @@ export default function ProjectReportPage() {
                 </h2>
                 <FindingsSummaryTable findings={findings} />
               </div>
+            ) : activeSection?.type === 'impacts' ? (
+              <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: 'var(--fg-subtle)', fontSize: 11 }}>
+                  <Zap size={12} />
+                  Synthèse automatique
+                </div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 20 }}>
+                  Impacts
+                </h2>
+                <ImpactsSummaryView findings={findings} />
+              </div>
             ) : activeSection?.type === 'attack_chains' ? (
               <AttackChainsEditor projectId={projectId} token={token!} allFindings={findings} />
             ) : activeSection ? (
@@ -1774,6 +1975,35 @@ export default function ProjectReportPage() {
                 onContentChange={(raw) => updateSectionContent(activeSection.id, raw)}
                 extraExtensions={extraExtensions}
                 extraSlashItems={extraSlashItems}
+                contentKey={contentVersion}
+                actions={activeSection.type === 'recommendations' && findings.some((f) => f.remediation) ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 14px',
+                      marginBottom: 16,
+                      borderRadius: 'var(--r-md)',
+                      background: 'color-mix(in oklch, var(--accent) 8%, var(--bg-elevated))',
+                      border: '1px solid color-mix(in oklch, var(--accent) 20%, transparent)',
+                    }}
+                  >
+                    <Sparkles size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--fg-muted)', flex: 1 }}>
+                      Pré-remplir à partir des remédiations des findings
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs gap-1.5"
+                      onClick={() => handleGenerateRecommendations(activeSection.id)}
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      Générer
+                    </Button>
+                  </div>
+                ) : undefined}
               />
             ) : activeFinding ? (
               <FindingEditor

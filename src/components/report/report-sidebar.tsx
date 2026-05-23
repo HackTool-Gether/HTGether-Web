@@ -28,6 +28,7 @@ import {
   Search,
   ShieldAlert,
   Link2,
+  Zap,
 } from 'lucide-react';
 import type { Severity } from '@/lib/api';
 
@@ -90,6 +91,7 @@ const SECTION_ICON: Record<string, typeof FileText> = {
   recommendations: Lightbulb,
   conclusion: Flag,
   findings: ShieldAlert,
+  impacts: Zap,
   attack_chains: Link2,
   custom: FileText,
 };
@@ -253,6 +255,7 @@ export function ReportSidebar({
 
   const findingsSectionId = sections.find((s) => s.type === 'findings')?.id;
   const hasFindingsSection = !!findingsSectionId;
+  const hasImpactsSection = sections.some((s) => s.type === 'impacts');
   const hasAttackChainsSection = sections.some((s) => s.type === 'attack_chains');
 
   const showFindingsList =
@@ -574,6 +577,36 @@ export function ReportSidebar({
           >
             <ShieldAlert size={12} />
             Ajouter les vulnérabilités
+          </button>
+        )}
+
+        {!hasImpactsSection && (
+          <button
+            type="button"
+            onClick={() => onAddSection('impacts')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              width: '100%',
+              padding: '5px 8px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--fg-subtle)',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              borderRadius: 'var(--r-sm)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--accent)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--fg-subtle)';
+            }}
+          >
+            <Zap size={12} />
+            Ajouter les impacts
           </button>
         )}
 
