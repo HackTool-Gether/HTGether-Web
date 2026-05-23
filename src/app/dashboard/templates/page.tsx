@@ -3,9 +3,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { templatesApi, ApiError, type ReportTemplate } from '@/lib/api';
+import { templatesApi, ApiError, type ReportTemplate, type LibraryTemplate } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Copy, Trash2, FileText, Star } from 'lucide-react';
+import { Loader2, Plus, Copy, Trash2, FileText, Star, Library, Download, X, Shield, Monitor, Globe, Smartphone, Search } from 'lucide-react';
+
+const CATEGORY_META: Record<string, { label: string; icon: typeof Shield; color: string }> = {
+  web: { label: 'Web', icon: Globe, color: 'oklch(0.65 0.15 250)' },
+  ad: { label: 'Active Directory', icon: Shield, color: 'oklch(0.55 0.15 300)' },
+  linux: { label: 'Linux', icon: Monitor, color: 'oklch(0.60 0.15 145)' },
+  mobile: { label: 'Mobile', icon: Smartphone, color: 'oklch(0.65 0.15 30)' },
+  recon: { label: 'Reconnaissance', icon: Search, color: 'oklch(0.60 0.12 60)' },
+};
 
 export default function TemplatesPage() {
   const router = useRouter();
@@ -14,6 +22,11 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
+
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [library, setLibrary] = useState<LibraryTemplate[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [importing, setImporting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -61,6 +74,36 @@ export default function TemplatesPage() {
     }
   };
 
+  const openLibrary = async () => {
+    setShowLibrary(true);
+    if (library.length > 0) return;
+    if (!token) return;
+    setLoadingLibrary(true);
+    try {
+      const data = await templatesApi.getLibrary(token);
+      setLibrary(data);
+    } catch {
+      setError('Impossible de charger la bibliothèque');
+    } finally {
+      setLoadingLibrary(false);
+    }
+  };
+
+  const handleImport = async (slug: string) => {
+    if (!token) return;
+    setImporting(slug);
+    try {
+      const t = await templatesApi.importFromLibrary(slug, token);
+      await load();
+      setShowLibrary(false);
+      router.push(`/dashboard/templates/${t.id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur lors de l\'import');
+    } finally {
+      setImporting(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -78,10 +121,16 @@ export default function TemplatesPage() {
             Gérez les modèles HTML utilisés pour générer les rapports PDF
           </p>
         </div>
-        <Button onClick={handleCreate} disabled={creating}>
-          {creating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1.5 h-3.5 w-3.5" />}
-          Nouveau template
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={openLibrary}>
+            <Library className="mr-1.5 h-3.5 w-3.5" />
+            Bibliothèque
+          </Button>
+          <Button onClick={handleCreate} disabled={creating}>
+            {creating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1.5 h-3.5 w-3.5" />}
+            Nouveau template
+          </Button>
+        </div>
       </div>
 
       <div className="px-4 sm:px-8 space-y-4">
@@ -91,11 +140,81 @@ export default function TemplatesPage() {
           </div>
         )}
 
+        {/* Library modal */}
+        {showLibrary && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowLibrary(false)}>
+            <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto mx-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-5 border-b border-border">
+                <div>
+                  <h2 className="text-lg font-semibold">Bibliothèque de templates</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Templates méthodologiques pré-configurés</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowLibrary(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="p-5 space-y-3">
+                {loadingLibrary ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  library.map((entry) => {
+                    const meta = CATEGORY_META[entry.category] || { label: entry.category, icon: FileText, color: 'var(--accent)' };
+                    const Icon = meta.icon;
+                    return (
+                      <div
+                        key={entry.slug}
+                        className="flex items-center gap-4 p-4 rounded-xl border border-border hover:border-accent/40 transition-colors"
+                      >
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: meta.color, color: 'white' }}
+                        >
+                          <Icon size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold">{entry.name}</div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{entry.description}</p>
+                          <span
+                            className="inline-block text-[10px] font-mono mt-1.5 px-1.5 py-0.5 rounded"
+                            style={{ background: `color-mix(in oklch, ${meta.color} 15%, transparent)`, color: meta.color }}
+                          >
+                            {meta.label}
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleImport(entry.slug)}
+                          disabled={importing !== null}
+                        >
+                          {importing === entry.slug ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : (
+                            <Download className="mr-1 h-3 w-3" />
+                          )}
+                          Importer
+                        </Button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {templates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <FileText className="h-12 w-12 mb-4 opacity-30" />
             <p className="text-sm font-medium">Aucun template</p>
             <p className="text-xs mt-1 opacity-60">Créez votre premier template de rapport</p>
+            <Button variant="secondary" size="sm" className="mt-4" onClick={openLibrary}>
+              <Library className="mr-1.5 h-3.5 w-3.5" />
+              Importer depuis la bibliothèque
+            </Button>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

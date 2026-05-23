@@ -571,6 +571,13 @@ export interface ReportTemplate {
   updatedAt: string;
 }
 
+export interface LibraryTemplate {
+  slug: string;
+  name: string;
+  description: string;
+  category: string;
+}
+
 export interface RenderResult {
   html: string;
   css: string;
@@ -636,6 +643,15 @@ export const templatesApi = {
   removeAsset: (assetId: string, token: string) =>
     apiRequest<{ message: string }>(`/templates/assets/${assetId}`, {
       method: 'DELETE',
+      token,
+    }),
+
+  getLibrary: (token: string) =>
+    apiRequest<LibraryTemplate[]>('/templates/library', { token }),
+
+  importFromLibrary: (slug: string, token: string) =>
+    apiRequest<ReportTemplate>(`/templates/library/${slug}/import`, {
+      method: 'POST',
       token,
     }),
 };
