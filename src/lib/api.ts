@@ -536,6 +536,86 @@ export const invitationsApi = {
     }),
 };
 
+// Templates API
+export interface TemplateVariable {
+  id: string;
+  label: string;
+  type: 'string' | 'markdown' | 'date' | 'number' | 'boolean' | 'enum' | 'image';
+  category?: string;
+  defaultValue?: any;
+  required?: boolean;
+  options?: { value: string; label: string }[];
+  helpText?: string;
+}
+
+export interface TemplateAssetData {
+  id: string;
+  fileName: string;
+  filePath: string;
+  type: string;
+  templateId: string;
+}
+
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  description: string;
+  htmlContent: string;
+  cssContent: string;
+  variables: TemplateVariable[];
+  previewData: Record<string, any>;
+  isDefault: boolean;
+  assets?: TemplateAssetData[];
+  _count?: { projects: number; assets: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RenderResult {
+  html: string;
+  css: string;
+}
+
+export const templatesApi = {
+  getAll: (token: string) =>
+    apiRequest<ReportTemplate[]>('/templates', { token }),
+
+  getOne: (id: string, token: string) =>
+    apiRequest<ReportTemplate>(`/templates/${id}`, { token }),
+
+  create: (data: { name: string; description?: string; htmlContent?: string; cssContent?: string; variables?: TemplateVariable[]; isDefault?: boolean }, token: string) =>
+    apiRequest<ReportTemplate>('/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  update: (id: string, data: Partial<{ name: string; description: string; htmlContent: string; cssContent: string; variables: TemplateVariable[]; previewData: Record<string, any>; isDefault: boolean }>, token: string) =>
+    apiRequest<ReportTemplate>(`/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  duplicate: (id: string, token: string) =>
+    apiRequest<ReportTemplate>(`/templates/${id}/duplicate`, {
+      method: 'POST',
+      token,
+    }),
+
+  remove: (id: string, token: string) =>
+    apiRequest<{ message: string }>(`/templates/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  preview: (id: string, token: string) =>
+    apiRequest<RenderResult>(`/templates/${id}/preview`, { token }),
+
+  render: (templateId: string, projectId: string, token: string) =>
+    apiRequest<RenderResult>(`/templates/${templateId}/render/${projectId}`, { token }),
+};
+
 // Reports API
 export interface Report {
   id: string;
