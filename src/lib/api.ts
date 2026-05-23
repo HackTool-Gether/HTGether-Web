@@ -253,6 +253,11 @@ export const projectsApi = {
       token,
     }),
 
+  getAvailableUsers: (projectId: string, token: string) =>
+    apiRequest<{ id: string; email: string; firstName: string; lastName: string }[]>(
+      `/projects/${projectId}/available-users`, { token },
+    ),
+
   getPermissions: (projectId: string, token: string) =>
     apiRequest<PermissionsResponse>(`/projects/${projectId}/permissions`, { token }),
 

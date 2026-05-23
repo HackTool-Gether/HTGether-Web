@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { templatesApi, ApiError, type ReportTemplate, type LibraryTemplate } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Copy, Trash2, FileText, Star, Library, Download, X, Shield, Monitor, Globe, Smartphone, Search } from 'lucide-react';
+import {
+  Loader2, Plus, Copy, Trash2, FileText, Star, Library, Download, X,
+  Shield, Monitor, Globe, Smartphone, Search, Cpu, Cloud, Wifi, Users,
+  Code2,
+} from 'lucide-react';
 
 const CATEGORY_META: Record<string, { label: string; icon: typeof Shield; color: string }> = {
   web: { label: 'Web', icon: Globe, color: 'oklch(0.65 0.15 250)' },
@@ -13,6 +17,11 @@ const CATEGORY_META: Record<string, { label: string; icon: typeof Shield; color:
   linux: { label: 'Linux', icon: Monitor, color: 'oklch(0.60 0.15 145)' },
   mobile: { label: 'Mobile', icon: Smartphone, color: 'oklch(0.65 0.15 30)' },
   recon: { label: 'Reconnaissance', icon: Search, color: 'oklch(0.60 0.12 60)' },
+  hardware: { label: 'Hardware / IoT', icon: Cpu, color: 'oklch(0.58 0.14 180)' },
+  api: { label: 'API', icon: Code2, color: 'oklch(0.62 0.16 270)' },
+  cloud: { label: 'Cloud', icon: Cloud, color: 'oklch(0.60 0.13 220)' },
+  wifi: { label: 'Wi-Fi', icon: Wifi, color: 'oklch(0.58 0.15 340)' },
+  social: { label: 'Social Engineering', icon: Users, color: 'oklch(0.55 0.12 20)' },
 };
 
 export default function TemplatesPage() {
@@ -27,6 +36,7 @@ export default function TemplatesPage() {
   const [library, setLibrary] = useState<LibraryTemplate[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -76,6 +86,7 @@ export default function TemplatesPage() {
 
   const openLibrary = async () => {
     setShowLibrary(true);
+    setCategoryFilter(null);
     if (library.length > 0) return;
     if (!token) return;
     setLoadingLibrary(true);
@@ -103,6 +114,12 @@ export default function TemplatesPage() {
       setImporting(null);
     }
   };
+
+  const filteredLibrary = categoryFilter
+    ? library.filter((e) => e.category === categoryFilter)
+    : library;
+
+  const categories = Array.from(new Set(library.map((e) => e.category)));
 
   if (loading) {
     return (
@@ -143,63 +160,105 @@ export default function TemplatesPage() {
         {/* Library modal */}
         {showLibrary && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowLibrary(false)}>
-            <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto mx-4" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between p-5 border-b border-border">
+            <div
+              className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden mx-4 flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-5 border-b border-border flex-shrink-0">
                 <div>
                   <h2 className="text-lg font-semibold">Bibliothèque de templates</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Templates méthodologiques pré-configurés</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {library.length} templates méthodologiques pré-configurés
+                  </p>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowLibrary(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              <div className="p-5 space-y-3">
+              {/* Category filters */}
+              {!loadingLibrary && categories.length > 0 && (
+                <div className="flex items-center gap-1.5 px-5 pt-4 pb-2 flex-wrap flex-shrink-0">
+                  <button
+                    className="text-xs px-2.5 py-1 rounded-full transition-colors"
+                    style={{
+                      background: !categoryFilter ? 'var(--accent)' : 'var(--muted)',
+                      color: !categoryFilter ? 'white' : 'var(--muted-foreground)',
+                    }}
+                    onClick={() => setCategoryFilter(null)}
+                  >
+                    Tous
+                  </button>
+                  {categories.map((cat) => {
+                    const meta = CATEGORY_META[cat];
+                    const active = categoryFilter === cat;
+                    return (
+                      <button
+                        key={cat}
+                        className="text-xs px-2.5 py-1 rounded-full transition-colors"
+                        style={{
+                          background: active ? meta?.color || 'var(--accent)' : 'var(--muted)',
+                          color: active ? 'white' : 'var(--muted-foreground)',
+                        }}
+                        onClick={() => setCategoryFilter(active ? null : cat)}
+                      >
+                        {meta?.label || cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="overflow-auto flex-1 p-5">
                 {loadingLibrary ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  library.map((entry) => {
-                    const meta = CATEGORY_META[entry.category] || { label: entry.category, icon: FileText, color: 'var(--accent)' };
-                    const Icon = meta.icon;
-                    return (
-                      <div
-                        key={entry.slug}
-                        className="flex items-center gap-4 p-4 rounded-xl border border-border hover:border-accent/40 transition-colors"
-                      >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {filteredLibrary.map((entry) => {
+                      const meta = CATEGORY_META[entry.category] || { label: entry.category, icon: FileText, color: 'var(--accent)' };
+                      const Icon = meta.icon;
+                      const isImporting = importing === entry.slug;
+                      return (
                         <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ background: meta.color, color: 'white' }}
+                          key={entry.slug}
+                          className="rounded-xl border border-border p-4 flex flex-col gap-3 transition-all cursor-pointer hover:bg-muted/50"
+                          style={{ borderLeftWidth: 3, borderLeftColor: meta.color }}
+                          onClick={() => !importing && handleImport(entry.slug)}
                         >
-                          <Icon size={20} />
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ background: `color-mix(in oklch, ${meta.color} 15%, transparent)`, color: meta.color }}
+                            >
+                              <Icon size={18} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold">{entry.name}</div>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{entry.description}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span
+                              className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                              style={{ background: `color-mix(in oklch, ${meta.color} 12%, transparent)`, color: meta.color }}
+                            >
+                              {meta.label}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                              {isImporting ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Download className="h-3 w-3" />
+                              )}
+                              {isImporting ? 'Import…' : 'Importer'}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold">{entry.name}</div>
-                          <p className="text-xs text-muted-foreground mt-0.5">{entry.description}</p>
-                          <span
-                            className="inline-block text-[10px] font-mono mt-1.5 px-1.5 py-0.5 rounded"
-                            style={{ background: `color-mix(in oklch, ${meta.color} 15%, transparent)`, color: meta.color }}
-                          >
-                            {meta.label}
-                          </span>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleImport(entry.slug)}
-                          disabled={importing !== null}
-                        >
-                          {importing === entry.slug ? (
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          ) : (
-                            <Download className="mr-1 h-3 w-3" />
-                          )}
-                          Importer
-                        </Button>
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </div>
@@ -221,11 +280,11 @@ export default function TemplatesPage() {
             {templates.map((t) => (
               <div
                 key={t.id}
-                className="rounded-xl bg-card border border-border p-4 flex flex-col gap-3 hover:border-accent/40 transition-colors cursor-pointer group"
+                className="rounded-xl bg-card border border-border p-4 flex flex-col gap-3 cursor-pointer group transition-colors hover:bg-muted/50"
                 onClick={() => router.push(`/dashboard/templates/${t.id}`)}
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <div
                       className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                       style={{

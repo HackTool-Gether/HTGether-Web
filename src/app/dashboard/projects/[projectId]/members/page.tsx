@@ -15,13 +15,11 @@ import {
 } from '@/components/ui/select';
 import {
   projectsApi,
-  usersApi,
   invitationsApi,
   ApiError,
   type ProjectDetail,
   type ProjectMember,
   type ProjectRole,
-  type User,
   type Invitation,
 } from '@/lib/api';
 import { PermissionMatrix } from '@/components/permissions/permission-matrix';
@@ -41,7 +39,7 @@ export default function MembersPage() {
   const { setActiveProject } = useShell();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<{ id: string; email: string; firstName: string; lastName: string }[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -63,12 +61,11 @@ export default function MembersPage() {
       } catch {
         // may fail if not a member
       }
-      // Load all users for invite (may fail for non-admins — that's fine)
       try {
-        const users = await usersApi.getAll(token);
+        const users = await projectsApi.getAvailableUsers(projectId, token);
         setAllUsers(users);
       } catch {
-        // non-admin can't list users, invite section won't show
+        // not a manager — invite section won't show
       }
     } catch {
       setError('Impossible de charger les membres');
@@ -95,11 +92,7 @@ export default function MembersPage() {
   const isManager =
     currentMember?.role === 'MANAGER' || currentUser?.role === 'SUPER_ADMIN';
 
-  const availableUsers = allUsers.filter(
-    (u) =>
-      !members.some((m) => m.user.id === u.id) &&
-      !pendingInvitations.some((inv) => inv.userId === u.id),
-  );
+  const availableUsers = allUsers;
 
   const handleInvite = async () => {
     if (!token || !inviteUserId) return;
@@ -195,12 +188,16 @@ export default function MembersPage() {
           <div className="rounded-xl bg-card p-4">
             <h3 className="text-sm font-semibold mb-3">Inviter un membre</h3>
             <div className="flex items-center gap-3 flex-wrap">
-              <Select value={inviteUserId || '__none__'} onValueChange={(v) => setInviteUserId(!v || v === '__none__' ? '' : v)}>
+              <Select value={inviteUserId || undefined} onValueChange={(v) => setInviteUserId(v)}>
                 <SelectTrigger className="w-[240px]">
-                  <SelectValue placeholder="Sélectionner un utilisateur" />
+                  <SelectValue placeholder="Sélectionner un utilisateur">
+                    {(() => {
+                      const u = availableUsers.find((x) => x.id === inviteUserId);
+                      return u ? `${u.firstName} ${u.lastName}` : undefined;
+                    })()}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__" disabled>Sélectionner un utilisateur</SelectItem>
                   {availableUsers.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.firstName} {u.lastName} ({u.email})
@@ -211,7 +208,7 @@ export default function MembersPage() {
 
               <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as ProjectRole)}>
                 <SelectTrigger className="w-[140px]">
-                  <SelectValue />
+                  <SelectValue>{ROLE_LABELS[inviteRole]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {(Object.keys(ROLE_LABELS) as ProjectRole[]).map((r) => (
