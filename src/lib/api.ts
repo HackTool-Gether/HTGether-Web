@@ -718,7 +718,9 @@ export const templatesApi = {
 export interface Report {
   id: string;
   projectId: string;
-  content: any; // ProseMirror JSON document
+  name: string;
+  content: any;
+  templateId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -731,6 +733,32 @@ export const reportsApi = {
     apiRequest<Report>(`/projects/${projectId}/report`, {
       method: 'PUT',
       body: JSON.stringify({ content }),
+      token,
+    }),
+
+  getAll: (projectId: string, token: string) =>
+    apiRequest<Report[]>(`/projects/${projectId}/reports`, { token }),
+
+  create: (projectId: string, data: { name: string; templateId?: string }, token: string) =>
+    apiRequest<Report>(`/projects/${projectId}/reports`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  getOne: (reportId: string, token: string) =>
+    apiRequest<Report>(`/reports/${reportId}`, { token }),
+
+  updateOne: (reportId: string, data: Partial<{ name: string; content: any; templateId: string }>, token: string) =>
+    apiRequest<Report>(`/reports/${reportId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (reportId: string, token: string) =>
+    apiRequest<void>(`/reports/${reportId}`, {
+      method: 'DELETE',
       token,
     }),
 };
