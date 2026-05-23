@@ -959,7 +959,7 @@ export interface CreateProjectData {
 }
 
 export interface OnboardingData {
-  admin: {
+  admin?: {
     email: string;
     password: string;
     firstName: string;
