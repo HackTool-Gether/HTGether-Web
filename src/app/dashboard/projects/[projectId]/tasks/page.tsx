@@ -386,7 +386,14 @@ export default function TasksPage() {
                       onValueChange={(v) => setForm({ ...form, assigneeId: !v || v === '__none__' ? '' : v })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Non assigné" />
+                        <SelectValue placeholder="Non assigné">
+                          {form.assigneeId
+                            ? (() => {
+                                const m = members.find((mb) => mb.id === form.assigneeId);
+                                return m ? `${m.user.firstName} ${m.user.lastName}` : 'Non assigné';
+                              })()
+                            : 'Non assigné'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">Non assigné</SelectItem>
