@@ -1,13 +1,27 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   FileText,
-  ShieldAlert,
   ChevronDown,
   ChevronRight,
   Plus,
   Trash2,
+  GripVertical,
   BookOpen,
   Target,
   FlaskConical,
@@ -48,6 +62,7 @@ interface ReportSidebarProps {
   onSelectFinding: (id: string) => void;
   onAddSection: () => void;
   onDeleteSection: (id: string) => void;
+  onReorderSections?: (fromIndex: number, toIndex: number) => void;
 }
 
 // ── Constants ───────────────────────────────────────────────────────────
@@ -77,6 +92,123 @@ const SECTION_ICON: Record<string, typeof FileText> = {
   custom: FileText,
 };
 
+// ── Sortable section item ──────────────────────────────────────────────
+
+function SortableSectionItem({
+  sec,
+  isActive,
+  onSelect,
+  onDelete,
+}: {
+  sec: SidebarSection;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sec.id });
+
+  const Icon = SECTION_ICON[sec.type] || FileText;
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '6px 8px',
+    borderRadius: 'var(--r-md)',
+    background: isDragging
+      ? 'var(--bg-subtle)'
+      : isActive
+        ? 'var(--accent-tint)'
+        : 'transparent',
+    borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+    cursor: 'pointer',
+    color: isActive ? 'var(--fg)' : 'var(--fg-muted)',
+    fontWeight: isActive ? 500 : 400,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    position: 'relative',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onSelect}
+      className="group"
+      onMouseEnter={(e) => {
+        if (!isActive && !isDragging) e.currentTarget.style.background = 'var(--bg-subtle)';
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive && !isDragging) e.currentTarget.style.background = 'transparent';
+      }}
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          cursor: 'grab',
+          color: 'var(--fg-subtle)',
+          opacity: 0,
+          transition: 'opacity 0.1s',
+          flexShrink: 0,
+          padding: '0 2px',
+        }}
+        className="group-hover:!opacity-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical size={11} />
+      </span>
+      <Icon size={13} style={{ flexShrink: 0, color: isActive ? 'var(--accent)' : 'var(--fg-subtle)' }} />
+      <span
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          fontSize: 12.5,
+        }}
+      >
+        {sec.title}
+      </span>
+      {!sec.predefined && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          style={{
+            opacity: 0,
+            transition: 'opacity 0.1s',
+            background: 'none',
+            border: 'none',
+            color: 'var(--sev-critical-fg)',
+            cursor: 'pointer',
+            padding: 2,
+            display: 'flex',
+            flexShrink: 0,
+          }}
+          className="group-hover:!opacity-100"
+          title="Supprimer"
+        >
+          <Trash2 size={11} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Component ───────────────────────────────────────────────────────────
 
 export function ReportSidebar({
@@ -87,11 +219,26 @@ export function ReportSidebar({
   onSelectFinding,
   onAddSection,
   onDeleteSection,
+  onReorderSections,
 }: ReportSidebarProps) {
   const [sectionsOpen, setSectionsOpen] = useState(true);
   const [findingsOpen, setFindingsOpen] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTags, setActiveTags] = useState<string[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onReorderSections) return;
+    const fromIndex = sections.findIndex((s) => s.id === active.id);
+    const toIndex = sections.findIndex((s) => s.id === over.id);
+    if (fromIndex !== -1 && toIndex !== -1) {
+      onReorderSections(fromIndex, toIndex);
+    }
+  };
 
   const allTags = Array.from(
     new Set(
@@ -162,74 +309,26 @@ export function ReportSidebar({
 
       {sectionsOpen && (
         <div style={{ padding: '0 8px' }}>
-          {sections.map((sec) => {
-            const isActive = activeView?.kind === 'section' && activeView.id === sec.id;
-            const Icon = SECTION_ICON[sec.type] || FileText;
-
-            return (
-              <div
-                key={sec.id}
-                onClick={() => onSelectSection(sec.id)}
-                className="group"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 8px',
-                  borderRadius: 'var(--r-md)',
-                  background: isActive ? 'var(--accent-tint)' : 'transparent',
-                  borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-                  cursor: 'pointer',
-                  color: isActive ? 'var(--fg)' : 'var(--fg-muted)',
-                  fontWeight: isActive ? 500 : 400,
-                  transition: 'background 0.1s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.background = 'var(--bg-subtle)';
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.background = 'transparent';
-                }}
-              >
-                <Icon size={13} style={{ flexShrink: 0, color: isActive ? 'var(--accent)' : 'var(--fg-subtle)' }} />
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    fontSize: 12.5,
-                  }}
-                >
-                  {sec.title}
-                </span>
-                {!sec.predefined && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteSection(sec.id);
-                    }}
-                    style={{
-                      opacity: 0,
-                      transition: 'opacity 0.1s',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--sev-critical-fg)',
-                      cursor: 'pointer',
-                      padding: 2,
-                      display: 'flex',
-                      flexShrink: 0,
-                    }}
-                    className="group-hover:!opacity-100"
-                    title="Supprimer"
-                  >
-                    <Trash2 size={11} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={sections.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {sections.map((sec) => (
+                <SortableSectionItem
+                  key={sec.id}
+                  sec={sec}
+                  isActive={activeView?.kind === 'section' && activeView.id === sec.id}
+                  onSelect={() => onSelectSection(sec.id)}
+                  onDelete={() => onDeleteSection(sec.id)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
 
           <button
             type="button"

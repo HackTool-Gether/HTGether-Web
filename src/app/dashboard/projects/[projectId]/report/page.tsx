@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { arrayMove } from '@dnd-kit/sortable';
 import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -922,6 +923,14 @@ export default function ProjectReportPage() {
     [sections, activeView, updateSections],
   );
 
+  const reorderSections = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const next = arrayMove(sections, fromIndex, toIndex);
+      updateSections(next);
+    },
+    [sections, updateSections],
+  );
+
   const updateSectionTitle = useCallback(
     (id: string, title: string) => {
       const next = sections.map((s) => (s.id === id ? { ...s, title } : s));
@@ -1333,6 +1342,7 @@ export default function ProjectReportPage() {
               onSelectFinding={(id) => setActiveView({ kind: 'finding', id })}
               onAddSection={addSection}
               onDeleteSection={deleteSection}
+              onReorderSections={reorderSections}
             />
           </div>
 
