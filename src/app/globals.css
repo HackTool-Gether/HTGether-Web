@@ -424,7 +424,9 @@ button { font-family: inherit; }
 .notion-editor pre code { background: none; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
 .notion-editor a { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .notion-editor hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
-.notion-editor img { max-width: 100%; height: auto; border-radius: var(--r-xl); margin: 1rem 0; }
+.notion-editor img { max-width: 100%; height: auto; border-radius: var(--r-xl); margin: 1rem 0; transition: box-shadow 0.15s ease, outline 0.15s ease; cursor: pointer; }
+.notion-editor img:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.notion-editor img.ProseMirror-selectednode { outline: 2.5px solid var(--accent); outline-offset: 2px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 15%, transparent); }
 .notion-editor table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; table-layout: fixed; }
 .notion-editor th, .notion-editor td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; min-width: 80px; font-size: 0.875rem; line-height: 1.5; }
 .notion-editor th { background: var(--bg-subtle); font-weight: 500; font-size: 0.8125rem; color: var(--fg-muted); }
