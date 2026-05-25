@@ -533,9 +533,7 @@ function SectionEditor({
 
       <div
         style={{
-          padding: '20px 24px',
-          background: 'var(--bg-elevated)',
-          borderRadius: 'var(--r-lg)',
+          padding: '0',
           flex: 1,
           minHeight: 400,
         }}
@@ -1945,7 +1943,7 @@ export default function ProjectReportPage() {
           </div>
 
           {/* Editor area */}
-          <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
+          <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg-elevated)' }}>
             {sections.length === 0 && findings.length === 0 ? (
               <EmptyState onGenerate={handleInitialize} findingsCount={findings.length} />
             ) : activeSection?.type === 'findings' ? (
