@@ -370,7 +370,8 @@ button { font-family: inherit; }
 /* =========================================================================
    TipTap editor styles
    ========================================================================= */
-.notion-editor-wrapper { position: relative; }
+.notion-editor-wrapper { position: relative; height: 100%; display: flex; flex-direction: column; }
+.notion-editor-wrapper .tiptap { flex: 1; }
 
 .notion-editor {
   outline: none;

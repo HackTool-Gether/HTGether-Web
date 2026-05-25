@@ -489,7 +489,7 @@ function SectionEditor({
   projectId?: string;
 }) {
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
+    <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
       <div
         style={{
           display: 'flex',
@@ -536,6 +536,7 @@ function SectionEditor({
           padding: '20px 24px',
           background: 'var(--bg-elevated)',
           borderRadius: 'var(--r-lg)',
+          flex: 1,
           minHeight: 400,
         }}
       >
