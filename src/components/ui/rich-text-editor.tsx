@@ -490,8 +490,8 @@ function FloatingButton({
       title={title}
       className={`p-1.5 rounded-md transition-colors ${
         active
-          ? 'bg-white/15 text-white'
-          : 'text-white/70 hover:bg-white/10 hover:text-white'
+          ? 'bg-foreground/10 text-foreground'
+          : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground'
       }`}
     >
       {children}
