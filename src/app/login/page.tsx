@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { setupApi, authProvidersApi, authApi, ApiError } from '@/lib/api';
+import { setupApi, authProvidersApi, authApi, settingsApi, ApiError } from '@/lib/api';
 import type { AuthProviderInfo } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, Globe, Server, KeyRound, Shield, Github, Chrome, Lock, Mail } from 'lucide-react';
+import { Loader2, AlertCircle, Globe, Server, KeyRound, Shield, Github, Chrome, Lock, Mail, Check } from 'lucide-react';
 import { HtgLogo } from '@/components/ui/htg-logo';
 
 function getProviderIcon(name: string) {
@@ -30,6 +30,11 @@ export default function LoginPage() {
   const [providers, setProviders] = useState<AuthProviderInfo[]>([]);
   const [activeTab, setActiveTab] = useState<'LOCAL' | 'LDAP'>('LOCAL');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [selfRegEnabled, setSelfRegEnabled] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [regForm, setRegForm] = useState({ email: '', firstName: '', lastName: '', password: '', confirmPassword: '' });
+  const [regSuccess, setRegSuccess] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
   const { login, loginWithTokens, user } = useAuth();
   const router = useRouter();
 
@@ -62,6 +67,11 @@ export default function LoginPage() {
         } else if (enabledProviders.some((p) => p.type === 'LDAP')) {
           setActiveTab('LDAP');
         }
+
+        try {
+          const { selfRegistrationEnabled } = await settingsApi.checkSelfRegistration();
+          setSelfRegEnabled(selfRegistrationEnabled);
+        } catch {}
       } catch {
         // API not reachable
       }
@@ -174,6 +184,37 @@ export default function LoginPage() {
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (regForm.password !== regForm.confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
+      return;
+    }
+    setError('');
+    setRegLoading(true);
+    try {
+      await authApi.register({
+        email: regForm.email,
+        firstName: regForm.firstName,
+        lastName: regForm.lastName,
+        password: regForm.password,
+      });
+      setShowRegister(false);
+      setRegSuccess('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
+      setRegForm({ email: '', firstName: '', lastName: '', password: '', confirmPassword: '' });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 403) setError('Le domaine de cet email n\'est pas autorisé');
+        else if (err.status === 409) setError('Un compte existe déjà avec cet email');
+        else setError(err.message);
+      } else {
+        setError('Erreur lors de la création du compte');
+      }
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
   if (checkingSetup) {
     return (
       <div className="flex h-screen items-center justify-center" style={{ background: 'var(--bg)' }}>
@@ -211,6 +252,14 @@ export default function LoginPage() {
             Connectez-vous pour accéder à votre espace de travail.
           </p>
 
+          {/* Success (registration) */}
+          {regSuccess && (
+            <Alert className="mb-4 border-green-500/30 bg-green-500/10">
+              <Check className="h-4 w-4 text-green-500" />
+              <AlertDescription className="text-green-600">{regSuccess}</AlertDescription>
+            </Alert>
+          )}
+
           {/* Error */}
           {error && (
             <Alert variant="destructive" className="mb-4">
@@ -219,6 +268,56 @@ export default function LoginPage() {
             </Alert>
           )}
 
+          {/* Registration form */}
+          {showRegister && (
+            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="grid grid-cols-2 gap-3">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <Label htmlFor="reg-firstName" style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>Prénom</Label>
+                  <Input id="reg-firstName" value={regForm.firstName} onChange={e => setRegForm({...regForm, firstName: e.target.value})} required className="h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <Label htmlFor="reg-lastName" style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>Nom</Label>
+                  <Input id="reg-lastName" value={regForm.lastName} onChange={e => setRegForm({...regForm, lastName: e.target.value})} required className="h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Label htmlFor="reg-email" style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>Email</Label>
+                <Input id="reg-email" type="email" value={regForm.email} onChange={e => setRegForm({...regForm, email: e.target.value})} required placeholder="prenom.nom@entreprise.com" className="h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm" />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Label htmlFor="reg-password" style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>Mot de passe</Label>
+                <Input id="reg-password" type="password" value={regForm.password} onChange={e => setRegForm({...regForm, password: e.target.value})} required minLength={8} className="h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm" />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Label htmlFor="reg-confirm" style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)' }}>Confirmer le mot de passe</Label>
+                <Input id="reg-confirm" type="password" value={regForm.confirmPassword} onChange={e => setRegForm({...regForm, confirmPassword: e.target.value})} required minLength={8} className="h-10 rounded-lg border-[var(--border)] bg-[var(--bg-elevated)] px-3 text-sm" />
+              </div>
+              <button
+                type="submit"
+                disabled={regLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  width: '100%', padding: '11px 16px', background: 'var(--accent)',
+                  color: 'var(--accent-fg)', border: 'none', borderRadius: 'var(--r-lg)',
+                  fontSize: 14, fontWeight: 500, cursor: regLoading ? 'not-allowed' : 'pointer',
+                  opacity: regLoading ? 0.7 : 1, transition: 'background 0.15s, opacity 0.15s',
+                  fontFamily: 'inherit', marginTop: 4,
+                }}
+                onMouseEnter={(e) => { if (!regLoading) e.currentTarget.style.background = 'var(--accent-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent)'; }}
+              >
+                {regLoading ? (<><Loader2 className="h-4 w-4 animate-spin" />Création...</>) : 'Créer mon compte'}
+              </button>
+              <div className="flex justify-center">
+                <button type="button" onClick={() => { setShowRegister(false); setError(''); }} className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                  Déjà un compte ? <span className="text-primary underline">Se connecter</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!showRegister && (<>
           {/* SSO Buttons */}
           {(oidcProviders.length > 0 || samlProviders.length > 0) && (
             <div className="flex flex-col gap-2.5 mb-6">
@@ -395,6 +494,18 @@ export default function LoginPage() {
               Réservé aux super-administrateurs de la plateforme
             </p>
           )}
+
+          {selfRegEnabled && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => { setShowRegister(true); setError(''); setRegSuccess(''); }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Pas encore de compte ? <span className="text-primary underline">Créer un compte</span>
+              </button>
+            </div>
+          )}
+          </>)}
         </div>
       </div>
 

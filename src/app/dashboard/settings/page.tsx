@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { settingsApi, authProvidersApi, knowledgeBaseApi, ApiError } from '@/lib/api';
-import type { KBEntry } from '@/lib/api';
+import type { KBEntry, AllowedDomain } from '@/lib/api';
 import type { AuthProviderFull } from '@/lib/api';
 import { useThemePreference } from '@/lib/theme-context';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ import {
   Upload,
   FileText,
   Pencil,
+  X,
 } from 'lucide-react';
 
 const ADMIN_TABS = [
@@ -117,6 +118,10 @@ export default function SettingsPage() {
   const [editingKbId, setEditingKbId] = useState<string | null>(null);
   const [editingKbEnterpriseId, setEditingKbEnterpriseId] = useState<string | null>(null);
 
+  // Allowed domains state
+  const [allowedDomains, setAllowedDomains] = useState<AllowedDomain[]>([]);
+  const [newDomain, setNewDomain] = useState('');
+
   // Copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -166,6 +171,9 @@ export default function SettingsPage() {
 
       // Auth providers
       setAuthProvidersList(providers);
+
+      // Allowed domains
+      settingsApi.getAllowedDomains(token).then(setAllowedDomains).catch(() => {});
 
       // AI
       if (allSettings.ai) {
@@ -387,6 +395,30 @@ export default function SettingsPage() {
       );
       setAuthProvidersList((prev) => [...prev, created]);
       showSuccess('Provider LDAP ajouté');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    }
+  };
+
+  const addDomain = async () => {
+    if (!newDomain.trim() || !token) return;
+    try {
+      await settingsApi.addAllowedDomain(newDomain.trim(), token);
+      setNewDomain('');
+      const domains = await settingsApi.getAllowedDomains(token);
+      setAllowedDomains(domains);
+      showSuccess('Domaine ajouté');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    }
+  };
+
+  const removeDomain = async (id: string) => {
+    if (!token) return;
+    try {
+      await settingsApi.deleteAllowedDomain(id, token);
+      setAllowedDomains(prev => prev.filter(d => d.id !== id));
+      showSuccess('Domaine supprimé');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur');
     }
@@ -618,6 +650,48 @@ export default function SettingsPage() {
               onDelete={() => deleteProvider(provider)}
             />
           ))}
+
+          {/* Allowed domains */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Globe className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <CardTitle className="text-sm">Domaines autorisés</CardTitle>
+                  <CardDescription>Auto-inscription pour les emails de ces domaines</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  value={newDomain}
+                  onChange={(e) => setNewDomain(e.target.value)}
+                  placeholder="domain.com ou *.domain.com"
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addDomain())}
+                  className="flex-1"
+                />
+                <Button onClick={addDomain} size="sm" disabled={!newDomain.trim()}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Ajouter
+                </Button>
+              </div>
+              {allowedDomains.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {allowedDomains.map((d) => (
+                    <span key={d.id} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-sm">
+                      {d.pattern}
+                      <button onClick={() => removeDomain(d.id)} className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Aucun domaine configuré. L&apos;auto-inscription est désactivée.</p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Add provider buttons */}
           {(availablePresets.length > 0 || ldapProviders.length === 0) && (

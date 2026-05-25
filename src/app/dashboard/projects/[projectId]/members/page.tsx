@@ -188,7 +188,7 @@ export default function MembersPage() {
           <div className="rounded-xl bg-card p-4">
             <h3 className="text-sm font-semibold mb-3">Inviter un membre</h3>
             <div className="flex items-center gap-3 flex-wrap">
-              <Select value={inviteUserId || undefined} onValueChange={(v) => setInviteUserId(v)}>
+              <Select value={inviteUserId || undefined} onValueChange={(v) => setInviteUserId(v ?? '')}>
                 <SelectTrigger className="w-[240px]">
                   <SelectValue placeholder="Sélectionner un utilisateur">
                     {(() => {

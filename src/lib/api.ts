@@ -131,6 +131,12 @@ export const authApi = {
       body: JSON.stringify(data),
       token,
     }),
+
+  register: (data: { email: string; firstName: string; lastName: string; password: string; avatarStyle?: string; avatarSeed?: string; avatarOptions?: any }) =>
+    apiRequest<{ message: string; userId: string }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // Setup API
@@ -166,6 +172,25 @@ export const settingsApi = {
     apiRequest<any>(`/settings/${key}`, {
       method: 'PUT',
       body: JSON.stringify({ value }),
+      token,
+    }),
+
+  checkSelfRegistration: () =>
+    apiRequest<{ selfRegistrationEnabled: boolean }>('/settings/allowed-domains/check'),
+
+  getAllowedDomains: (token: string) =>
+    apiRequest<AllowedDomain[]>('/settings/allowed-domains', { token }),
+
+  addAllowedDomain: (pattern: string, token: string) =>
+    apiRequest<AllowedDomain>('/settings/allowed-domains', {
+      method: 'POST',
+      body: JSON.stringify({ pattern }),
+      token,
+    }),
+
+  deleteAllowedDomain: (id: string, token: string) =>
+    apiRequest<void>(`/settings/allowed-domains/${id}`, {
+      method: 'DELETE',
       token,
     }),
 };
@@ -813,9 +838,11 @@ export interface User {
   avatarSeed?: string;
   avatarOptions?: Record<string, any>;
   createdAt?: string;
+  lastLoginAt?: string;
 }
 
 export interface UserDetail extends User {
+  lastLoginAt?: string;
   projectMembers?: {
     role: string;
     project: { id: string; name: string; clientCompany: string; status: string };
@@ -874,6 +901,13 @@ export interface CompanySettings {
   name: string;
   domain?: string;
   logoUrl?: string;
+}
+
+export interface AllowedDomain {
+  id: string;
+  pattern: string;
+  createdAt: string;
+  createdById: string | null;
 }
 
 export type ProjectStatus = 'DRAFT' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DELIVERED' | 'ARCHIVED';

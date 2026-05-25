@@ -32,6 +32,21 @@ import {
 } from 'lucide-react';
 import { generateAvatarSvg } from '@/lib/dicebear';
 
+function formatRelativeDate(dateStr?: string): string {
+  if (!dateStr) return 'Jamais';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMin < 1) return 'À l\'instant';
+  if (diffMin < 60) return `Il y a ${diffMin} min`;
+  if (diffHours < 24) return `Il y a ${diffHours}h`;
+  if (diffDays < 7) return `Il y a ${diffDays}j`;
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
 export default function UsersPage() {
   const { user: currentUser, token } = useAuth();
   const router = useRouter();
@@ -293,6 +308,9 @@ export default function UsersPage() {
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">{u.email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Dernière connexion : {formatRelativeDate(u.lastLoginAt)}
+                  </p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
