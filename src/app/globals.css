@@ -435,6 +435,18 @@ button { font-family: inherit; }
 .bubble-menu { display: flex; align-items: center; gap: 0.125rem; background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 0.25rem; box-shadow: var(--shadow-md); }
 .bubble-sep { width: 1px; height: 1.25rem; background: var(--border); margin: 0 0.125rem; }
 
+.inline-prompt-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); backdrop-filter: blur(2px); }
+.inline-prompt { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--r-xl); padding: 1.25rem; width: 380px; box-shadow: var(--shadow-lg); }
+.inline-prompt-title { font-size: 0.875rem; font-weight: 600; color: var(--fg); margin-bottom: 0.75rem; }
+.inline-prompt-input { width: 100%; padding: 0.5rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg); color: var(--fg); outline: none; transition: border-color 0.15s; }
+.inline-prompt-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+.inline-prompt-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.75rem; }
+.inline-prompt-btn { padding: 0.375rem 0.875rem; font-size: 0.8125rem; font-weight: 500; border-radius: var(--r-md); border: none; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.inline-prompt-btn.cancel { background: var(--bg-subtle); color: var(--fg-muted); }
+.inline-prompt-btn.cancel:hover { background: var(--border); color: var(--fg); }
+.inline-prompt-btn.confirm { background: var(--accent); color: white; }
+.inline-prompt-btn.confirm:hover { opacity: 0.9; }
+
 .slash-menu { background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 0.375rem; box-shadow: var(--shadow-md); max-height: 320px; overflow-y: auto; width: 280px; }
 .slash-menu-item { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.5rem 0.625rem; border-radius: var(--r-md); border: none; background: none; cursor: pointer; text-align: left; transition: background-color 0.1s ease; color: var(--fg); }
 .slash-menu-item:hover, .slash-menu-item.is-selected { background: var(--bg-subtle); }

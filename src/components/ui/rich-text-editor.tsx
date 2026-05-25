@@ -53,6 +53,56 @@ import { useAiGeneration } from '@/lib/use-ai-generation';
 
 const lowlight = createLowlight(common);
 
+// --- Inline prompt modal ---
+interface InlinePromptState {
+  visible: boolean;
+  title: string;
+  placeholder: string;
+  defaultValue: string;
+  onSubmit: (value: string) => void;
+}
+
+const INLINE_PROMPT_INITIAL: InlinePromptState = {
+  visible: false, title: '', placeholder: '', defaultValue: '', onSubmit: () => {},
+};
+
+function InlinePromptModal({ state, onClose }: { state: InlinePromptState; onClose: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(state.defaultValue);
+
+  useEffect(() => {
+    setValue(state.defaultValue);
+    if (state.visible) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [state.visible, state.defaultValue]);
+
+  if (!state.visible) return null;
+
+  const submit = () => {
+    const v = value.trim();
+    if (v) { state.onSubmit(v); onClose(); }
+  };
+
+  return (
+    <div className="inline-prompt-overlay" onClick={onClose}>
+      <div className="inline-prompt" onClick={(e) => e.stopPropagation()}>
+        <p className="inline-prompt-title">{state.title}</p>
+        <input
+          ref={inputRef}
+          className="inline-prompt-input"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={state.placeholder}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onClose(); }}
+        />
+        <div className="inline-prompt-actions">
+          <button type="button" className="inline-prompt-btn cancel" onClick={onClose}>Annuler</button>
+          <button type="button" className="inline-prompt-btn confirm" onClick={submit}>Confirmer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Slash command items ---
 interface SlashItem {
   title: string;
@@ -147,10 +197,18 @@ const SLASH_ITEMS: SlashItem[] = [
     description: 'Inserer une image via URL',
     icon: <ImageIcon size={18} />,
     command: ({ editor, range }) => {
-      const url = window.prompt("URL de l'image");
-      if (url) {
-        editor.chain().focus().deleteRange(range).setImage({ src: url }).run();
-      }
+      editor.chain().focus().deleteRange(range).run();
+      const event = new CustomEvent('open-prompt', {
+        detail: {
+          title: "Image",
+          placeholder: "https://exemple.com/image.png",
+          defaultValue: "",
+          callback: (url: string) => {
+            editor.chain().focus().setImage({ src: url }).run();
+          },
+        },
+      });
+      editor.view.dom.dispatchEvent(event);
     },
   },
   {
@@ -189,9 +247,17 @@ const SLASH_ITEMS: SlashItem[] = [
     icon: <Wand2 size={18} />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
-      const prompt = window.prompt('Que souhaitez-vous générer ?');
-      if (!prompt?.trim()) return;
-      const event = new CustomEvent('ai-trigger', { detail: { action: 'generate', prompt: prompt.trim() } });
+      const event = new CustomEvent('open-prompt', {
+        detail: {
+          title: "Generer avec l'IA",
+          placeholder: "Decrivez ce que vous souhaitez generer...",
+          defaultValue: "",
+          callback: (prompt: string) => {
+            const aiEvent = new CustomEvent('ai-trigger', { detail: { action: 'generate', prompt } });
+            editor.view.dom.dispatchEvent(aiEvent);
+          },
+        },
+      });
       editor.view.dom.dispatchEvent(event);
     },
   },
@@ -500,7 +566,7 @@ function FloatingButton({
 }
 
 // --- Floating toolbar ---
-function FloatingToolbar({ editor, onAiTrigger, aiGenerating }: { editor: any; onAiTrigger?: (action: string) => void; aiGenerating?: boolean }) {
+function FloatingToolbar({ editor, onAiTrigger, aiGenerating, onOpenPrompt }: { editor: any; onAiTrigger?: (action: string) => void; aiGenerating?: boolean; onOpenPrompt?: (state: Omit<InlinePromptState, 'visible'>) => void }) {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -561,13 +627,20 @@ function FloatingToolbar({ editor, onAiTrigger, aiGenerating }: { editor: any; o
 
   const handleLink = () => {
     const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('URL du lien', previousUrl || 'https://');
-    if (url === null) return;
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
+    if (onOpenPrompt) {
+      onOpenPrompt({
+        title: 'Lien',
+        placeholder: 'https://exemple.com',
+        defaultValue: previousUrl || 'https://',
+        onSubmit: (url: string) => {
+          if (!url) {
+            editor.chain().focus().extendMarkRange('link').unsetLink().run();
+          } else {
+            editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+          }
+        },
+      });
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   };
 
   const s = 15;
@@ -726,6 +799,15 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
   ) {
     // AI generation
     const { generating: aiGenerating, generate: aiGenerate, cancel: aiCancel } = useAiGeneration();
+
+    // Inline prompt state
+    const [inlinePrompt, setInlinePrompt] = useState<InlinePromptState>(INLINE_PROMPT_INITIAL);
+    const openPrompt = useCallback((opts: Omit<InlinePromptState, 'visible'>) => {
+      setInlinePrompt({ ...opts, visible: true });
+    }, []);
+    const closePrompt = useCallback(() => {
+      setInlinePrompt(INLINE_PROMPT_INITIAL);
+    }, []);
 
     // Slash command state
     const [slashOpen, setSlashOpen] = useState(false);
@@ -959,13 +1041,28 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
     useEffect(() => {
       if (!editor) return;
       const dom = editor.view.dom;
-      const handler = (e: Event) => {
+      const aiHandler = (e: Event) => {
         const detail = (e as CustomEvent).detail;
         if (detail?.action) handleAiTrigger(detail.action, detail.prompt);
       };
-      dom.addEventListener('ai-trigger', handler);
-      return () => dom.removeEventListener('ai-trigger', handler);
-    }, [editor, handleAiTrigger]);
+      const promptHandler = (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail?.callback) {
+          openPrompt({
+            title: detail.title || '',
+            placeholder: detail.placeholder || '',
+            defaultValue: detail.defaultValue || '',
+            onSubmit: detail.callback,
+          });
+        }
+      };
+      dom.addEventListener('ai-trigger', aiHandler);
+      dom.addEventListener('open-prompt', promptHandler);
+      return () => {
+        dom.removeEventListener('ai-trigger', aiHandler);
+        dom.removeEventListener('open-prompt', promptHandler);
+      };
+    }, [editor, handleAiTrigger, openPrompt]);
 
     useEffect(() => {
       if (!editor || !aiGenerating) return;
@@ -986,7 +1083,7 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
         <BlockHandle editor={editor} onAddClick={() => {}} />
 
         {/* Floating toolbar on text selection */}
-        <FloatingToolbar editor={editor} onAiTrigger={handleAiTrigger} aiGenerating={aiGenerating} />
+        <FloatingToolbar editor={editor} onAiTrigger={handleAiTrigger} aiGenerating={aiGenerating} onOpenPrompt={openPrompt} />
 
         {/* AI generating indicator */}
         {aiGenerating && (
@@ -1021,6 +1118,9 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
             />
           </div>
         )}
+
+        {/* Inline prompt modal */}
+        <InlinePromptModal state={inlinePrompt} onClose={closePrompt} />
 
         {/* Editor */}
         <EditorContent editor={editor} />
