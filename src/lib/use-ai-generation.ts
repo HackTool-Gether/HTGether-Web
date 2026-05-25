@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { useAuth } from './auth-context';
+import { getValidToken } from './api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -24,12 +25,12 @@ export function useAiGeneration() {
     abortRef.current = controller;
     setGenerating(true);
 
-    try {
-      const res = await fetch(`${API_URL}/ai/generate`, {
+    const doFetch = async (authToken: string) => {
+      return fetch(`${API_URL}/ai/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           content: params.content,
@@ -39,6 +40,17 @@ export function useAiGeneration() {
         }),
         signal: controller.signal,
       });
+    };
+
+    try {
+      let res = await doFetch(token);
+
+      if (res.status === 401) {
+        const newToken = await getValidToken();
+        if (newToken) {
+          res = await doFetch(newToken);
+        }
+      }
 
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ message: 'Erreur IA' }));

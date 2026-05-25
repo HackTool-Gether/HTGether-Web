@@ -1,14 +1,48 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
+const TOKEN_KEY = 'htgether_token';
+const REFRESH_TOKEN_KEY = 'htgether_refresh_token';
+const USER_KEY = 'htgether_user';
+
+let refreshPromise: Promise<string | null> | null = null;
+
+export async function getValidToken(): Promise<string | null> {
+  if (!refreshPromise) refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+async function tryRefreshToken(): Promise<string | null> {
+  const refreshToken = typeof window !== 'undefined' ? localStorage.getItem(REFRESH_TOKEN_KEY) : null;
+  if (!refreshToken) return null;
+
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    localStorage.setItem(TOKEN_KEY, data.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    window.dispatchEvent(new CustomEvent('auth-refreshed', { detail: data }));
+    return data.accessToken;
+  } catch {
+    return null;
+  }
+}
+
 interface ApiOptions extends RequestInit {
   token?: string;
+  _retried?: boolean;
 }
 
 async function apiRequest<T>(
   endpoint: string,
   options: ApiOptions = {},
 ): Promise<T> {
-  const { token, headers: customHeaders, ...rest } = options;
+  const { token, _retried, headers: customHeaders, ...rest } = options;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -23,6 +57,14 @@ async function apiRequest<T>(
     headers,
     ...rest,
   });
+
+  if (res.status === 401 && token && !_retried && !endpoint.includes('/auth/refresh')) {
+    if (!refreshPromise) refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
+    const newToken = await refreshPromise;
+    if (newToken) {
+      return apiRequest<T>(endpoint, { ...options, token: newToken, _retried: true });
+    }
+  }
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: 'Request failed' }));

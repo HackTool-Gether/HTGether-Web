@@ -39,6 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }, []);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const data = (e as CustomEvent).detail as LoginResponse;
+      setToken(data.accessToken);
+      setUser(data.user);
+    };
+    window.addEventListener('auth-refreshed', handler);
+    return () => window.removeEventListener('auth-refreshed', handler);
+  }, []);
+
   const clearAuth = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
