@@ -168,11 +168,17 @@ const SLASH_ITEMS: SlashItem[] = [
   },
   {
     title: 'IA - Reformuler',
-    description: "Reformuler la selection avec l'IA",
+    description: "Reformuler le bloc courant avec l'IA",
     icon: <Sparkles size={18} />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
-      editor.commands.focus();
+      const { from } = editor.state.selection;
+      const resolved = editor.state.doc.resolve(from);
+      const blockStart = resolved.before(1);
+      const blockNode = editor.state.doc.nodeAt(blockStart);
+      if (!blockNode || !blockNode.textContent.trim()) return;
+      const blockEnd = blockStart + blockNode.nodeSize;
+      editor.chain().focus().setTextSelection({ from: blockStart, to: blockEnd }).run();
       const event = new CustomEvent('ai-trigger', { detail: { action: 'reformulate' } });
       editor.view.dom.dispatchEvent(event);
     },
@@ -183,8 +189,9 @@ const SLASH_ITEMS: SlashItem[] = [
     icon: <Wand2 size={18} />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
-      editor.commands.focus();
-      const event = new CustomEvent('ai-trigger', { detail: { action: 'generate' } });
+      const prompt = window.prompt('Que souhaitez-vous générer ?');
+      if (!prompt?.trim()) return;
+      const event = new CustomEvent('ai-trigger', { detail: { action: 'generate', prompt: prompt.trim() } });
       editor.view.dom.dispatchEvent(event);
     },
   },
@@ -917,17 +924,25 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
 
     useImperativeHandle(ref, () => editor, [editor]);
 
-    const handleAiTrigger = useCallback((action: string) => {
+    const handleAiTrigger = useCallback((action: string, promptOverride?: string) => {
       if (!editor || aiGenerating) return;
-      const { text, images } = extractSelectionContent(editor);
-      if (!text && images.length === 0) return;
 
-      const { from, to } = editor.state.selection;
+      let content: string;
+      let images: string[] = [];
 
-      editor.chain().focus().deleteRange({ from, to }).run();
+      if (promptOverride) {
+        content = promptOverride;
+      } else {
+        const sel = extractSelectionContent(editor);
+        content = sel.text;
+        images = sel.images;
+        if (!content && images.length === 0) return;
+        const { from, to } = editor.state.selection;
+        editor.chain().focus().deleteRange({ from, to }).run();
+      }
 
       aiGenerate({
-        content: text,
+        content,
         images: images.length > 0 ? images : undefined,
         projectId,
         action: action as 'reformulate' | 'generate' | 'complete',
@@ -946,7 +961,7 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
       const dom = editor.view.dom;
       const handler = (e: Event) => {
         const detail = (e as CustomEvent).detail;
-        if (detail?.action) handleAiTrigger(detail.action);
+        if (detail?.action) handleAiTrigger(detail.action, detail.prompt);
       };
       dom.addEventListener('ai-trigger', handler);
       return () => dom.removeEventListener('ai-trigger', handler);
