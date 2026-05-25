@@ -530,6 +530,44 @@ button { font-family: inherit; }
 .sev-badge.sev-low { color: var(--sev-low-fg); background: var(--sev-low-bg); }
 .sev-badge.sev-info { color: var(--sev-info-fg); background: var(--sev-info-bg); }
 
+/* AI generation */
+.ai-generating .notion-editor::after {
+  content: '\25CB';
+  animation: ai-blink 0.8s infinite;
+  color: var(--accent);
+  font-size: 1.1em;
+}
+@keyframes ai-blink { 50% { opacity: 0; } }
+
+.ai-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--accent-tint);
+  border: 1px solid rgba(94, 106, 210, 0.25);
+  border-radius: var(--r-lg);
+  font-size: 13px;
+  color: var(--accent-hover);
+  margin-bottom: 8px;
+}
+.ai-cancel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.ai-cancel-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
 @layer base {
   body { background: var(--bg); color: var(--fg); }
 }

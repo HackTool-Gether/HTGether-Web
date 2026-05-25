@@ -44,7 +44,12 @@ import {
   Plus,
   GripVertical,
   Table as TableIcon,
+  Sparkles,
+  Wand2,
+  Loader2,
+  X,
 } from 'lucide-react';
+import { useAiGeneration } from '@/lib/use-ai-generation';
 
 const lowlight = createLowlight(common);
 
@@ -159,6 +164,28 @@ const SLASH_ITEMS: SlashItem[] = [
         .deleteRange(range)
         .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
         .run();
+    },
+  },
+  {
+    title: 'IA - Reformuler',
+    description: "Reformuler la selection avec l'IA",
+    icon: <Sparkles size={18} />,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      editor.commands.focus();
+      const event = new CustomEvent('ai-trigger', { detail: { action: 'reformulate' } });
+      editor.view.dom.dispatchEvent(event);
+    },
+  },
+  {
+    title: 'IA - Generer',
+    description: "Generer du contenu avec l'IA",
+    icon: <Wand2 size={18} />,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      editor.commands.focus();
+      const event = new CustomEvent('ai-trigger', { detail: { action: 'generate' } });
+      editor.view.dom.dispatchEvent(event);
     },
   },
 ];
@@ -466,7 +493,7 @@ function FloatingButton({
 }
 
 // --- Floating toolbar ---
-function FloatingToolbar({ editor }: { editor: any }) {
+function FloatingToolbar({ editor, onAiTrigger, aiGenerating }: { editor: any; onAiTrigger?: (action: string) => void; aiGenerating?: boolean }) {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -591,6 +618,17 @@ function FloatingToolbar({ editor }: { editor: any }) {
       <FloatingButton onClick={handleLink} active={editor.isActive('link')} title="Lien">
         <LinkIcon size={s} />
       </FloatingButton>
+      {onAiTrigger && (
+        <>
+          <div className="bubble-sep" />
+          <FloatingButton
+            onClick={() => onAiTrigger('reformulate')}
+            title="Reformuler avec l'IA"
+          >
+            {aiGenerating ? <Loader2 size={s} className="animate-spin" /> : <Sparkles size={s} />}
+          </FloatingButton>
+        </>
+      )}
     </div>
   );
 }
@@ -614,6 +652,55 @@ function parseInitialContent(content: string, mode: 'html' | 'json') {
   return content;
 }
 
+// --- Image paste/drop helpers ---
+function compressImage(dataUrl: string, maxWidth = 1200): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width;
+      let h = img.height;
+      if (w > maxWidth) {
+        h = Math.round((h * maxWidth) / w);
+        w = maxWidth;
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = dataUrl;
+  });
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function insertImageFile(editor: any, file: File) {
+  const dataUrl = await readFileAsDataUrl(file);
+  const src = file.size > 500 * 1024 ? await compressImage(dataUrl) : dataUrl;
+  editor.chain().focus().setImage({ src }).run();
+}
+
+function extractSelectionContent(editor: any): { text: string; images: string[] } {
+  const { from, to } = editor.state.selection;
+  const text = editor.state.doc.textBetween(from, to, '\n');
+  const images: string[] = [];
+  editor.state.doc.nodesBetween(from, to, (node: any) => {
+    if (node.type.name === 'image' && node.attrs.src) {
+      images.push(node.attrs.src);
+    }
+  });
+  return { text, images };
+}
+
 // --- Main editor ---
 interface RichTextEditorProps {
   content: string;
@@ -622,13 +709,17 @@ interface RichTextEditorProps {
   extraExtensions?: any[];
   extraSlashItems?: SlashItem[];
   storageMode?: 'html' | 'json';
+  projectId?: string;
 }
 
 export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
   function RichTextEditor(
-    { content, onChange, placeholder, extraExtensions = [], extraSlashItems = [], storageMode = 'html' },
+    { content, onChange, placeholder, extraExtensions = [], extraSlashItems = [], storageMode = 'html', projectId },
     ref,
   ) {
+    // AI generation
+    const { generating: aiGenerating, generate: aiGenerate, cancel: aiCancel } = useAiGeneration();
+
     // Slash command state
     const [slashOpen, setSlashOpen] = useState(false);
     const [slashItems, setSlashItems] = useState<SlashItem[]>([]);
@@ -796,20 +887,102 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
         attributes: {
           class: 'notion-editor',
         },
+        handlePaste: (_view, event) => {
+          const items = event.clipboardData?.items;
+          if (!items) return false;
+          for (const item of Array.from(items)) {
+            if (item.type.startsWith('image/')) {
+              event.preventDefault();
+              const file = item.getAsFile();
+              if (file) insertImageFile(editor!, file);
+              return true;
+            }
+          }
+          return false;
+        },
+        handleDrop: (_view, event) => {
+          const files = event.dataTransfer?.files;
+          if (!files || files.length === 0) return false;
+          for (const file of Array.from(files)) {
+            if (file.type.startsWith('image/')) {
+              event.preventDefault();
+              insertImageFile(editor!, file);
+              return true;
+            }
+          }
+          return false;
+        },
       },
     });
 
     useImperativeHandle(ref, () => editor, [editor]);
 
+    const handleAiTrigger = useCallback((action: string) => {
+      if (!editor || aiGenerating) return;
+      const { text, images } = extractSelectionContent(editor);
+      if (!text && images.length === 0) return;
+
+      const { from, to } = editor.state.selection;
+
+      editor.chain().focus().deleteRange({ from, to }).run();
+
+      aiGenerate({
+        content: text,
+        images: images.length > 0 ? images : undefined,
+        projectId,
+        action: action as 'reformulate' | 'generate' | 'complete',
+        onChunk: (chunk) => {
+          editor.commands.insertContent(chunk);
+        },
+        onDone: () => {},
+        onError: (err) => {
+          editor.commands.insertContent(`\n[Erreur IA : ${err}]`);
+        },
+      });
+    }, [editor, aiGenerating, aiGenerate, projectId]);
+
+    useEffect(() => {
+      if (!editor) return;
+      const dom = editor.view.dom;
+      const handler = (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail?.action) handleAiTrigger(detail.action);
+      };
+      dom.addEventListener('ai-trigger', handler);
+      return () => dom.removeEventListener('ai-trigger', handler);
+    }, [editor, handleAiTrigger]);
+
+    useEffect(() => {
+      if (!editor || !aiGenerating) return;
+      const handler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          aiCancel();
+        }
+      };
+      window.addEventListener('keydown', handler);
+      return () => window.removeEventListener('keydown', handler);
+    }, [editor, aiGenerating, aiCancel]);
+
     if (!editor) return null;
 
     return (
-      <div className="notion-editor-wrapper">
+      <div className={`notion-editor-wrapper ${aiGenerating ? 'ai-generating' : ''}`}>
         {/* Block handle (+ and grip) */}
         <BlockHandle editor={editor} onAddClick={() => {}} />
 
         {/* Floating toolbar on text selection */}
-        <FloatingToolbar editor={editor} />
+        <FloatingToolbar editor={editor} onAiTrigger={handleAiTrigger} aiGenerating={aiGenerating} />
+
+        {/* AI generating indicator */}
+        {aiGenerating && (
+          <div className="ai-indicator">
+            <Loader2 size={14} className="animate-spin" />
+            <span>Generation IA en cours...</span>
+            <button type="button" onClick={aiCancel} className="ai-cancel-btn" title="Annuler (Echap)">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Slash command popup */}
         {slashOpen && slashPos && (

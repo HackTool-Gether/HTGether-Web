@@ -477,6 +477,7 @@ function SectionEditor({
   extraSlashItems,
   contentKey,
   actions,
+  projectId,
 }: {
   section: ReportSection;
   onTitleChange: (title: string) => void;
@@ -485,6 +486,7 @@ function SectionEditor({
   extraSlashItems: any[];
   contentKey?: number;
   actions?: React.ReactNode;
+  projectId?: string;
 }) {
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 32px' }}>
@@ -545,6 +547,7 @@ function SectionEditor({
           placeholder="Commencez à écrire… (tapez / pour les commandes)"
           extraExtensions={extraExtensions}
           extraSlashItems={extraSlashItems}
+          projectId={projectId}
         />
       </div>
     </div>
@@ -1976,6 +1979,7 @@ export default function ProjectReportPage() {
                 extraExtensions={extraExtensions}
                 extraSlashItems={extraSlashItems}
                 contentKey={contentVersion}
+                projectId={projectId}
                 actions={activeSection.type === 'recommendations' && findings.some((f) => f.remediation) ? (
                   <div
                     style={{

@@ -250,6 +250,7 @@ export default function NoteEditorPage() {
             content={content}
             onChange={handleContentChange}
             placeholder="Tapez '/' pour les commandes..."
+            projectId={projectId}
           />
         </div>
       </div>

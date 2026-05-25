@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { settingsApi, authProvidersApi, ApiError } from '@/lib/api';
+import { settingsApi, authProvidersApi, knowledgeBaseApi, ApiError } from '@/lib/api';
+import type { KBEntry } from '@/lib/api';
 import type { AuthProviderFull } from '@/lib/api';
 import { useThemePreference } from '@/lib/theme-context';
 import { Button } from '@/components/ui/button';
@@ -41,23 +42,32 @@ import {
   Trash2,
   Plus,
   Sun,
+  BookOpen,
+  Library,
+  Upload,
+  FileText,
+  Pencil,
 } from 'lucide-react';
 
 const ADMIN_TABS = [
   { id: 'preferences', label: 'Preferences', icon: Sun },
+  { id: 'kb', label: 'Ma base de connaissances', icon: BookOpen },
   { id: 'company', label: 'Entreprise', icon: Building2 },
   { id: 'auth', label: 'Authentification', icon: KeyRound },
   { id: 'ai', label: 'Module IA', icon: Brain },
   { id: 'email', label: 'Email', icon: Mail },
+  { id: 'kb-enterprise', label: 'KB Entreprise', icon: Library },
 ] as const;
 
 const USER_TABS = [
   { id: 'preferences', label: 'Preferences', icon: Sun },
+  { id: 'kb', label: 'Ma base de connaissances', icon: BookOpen },
 ] as const;
 
-type TabId = 'preferences' | 'company' | 'auth' | 'ai' | 'email';
+type TabId = 'preferences' | 'company' | 'auth' | 'ai' | 'email' | 'kb' | 'kb-enterprise';
 
 const AI_PROVIDERS = [
+  { id: 'openrouter', name: 'OpenRouter', description: 'Tous les modèles', models: [] as string[] },
   { id: 'openai', name: 'OpenAI', description: 'GPT-4, GPT-4o', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'] },
   { id: 'anthropic', name: 'Anthropic', description: 'Claude 4', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'] },
   { id: 'gemini', name: 'Google Gemini', description: 'Gemini Pro, Ultra', models: ['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-pro'] },
@@ -97,6 +107,16 @@ export default function SettingsPage() {
     apiKey: '', domain: '', fromEmail: '', fromName: '',
   });
 
+  // KB state
+  const [kbEntries, setKbEntries] = useState<KBEntry[]>([]);
+  const [kbEnterpriseEntries, setKbEnterpriseEntries] = useState<KBEntry[]>([]);
+  const [kbForm, setKbForm] = useState({ title: '', content: '' });
+  const [kbEnterpriseForm, setKbEnterpriseForm] = useState({ title: '', content: '' });
+  const [showKbForm, setShowKbForm] = useState(false);
+  const [showKbEnterpriseForm, setShowKbEnterpriseForm] = useState(false);
+  const [editingKbId, setEditingKbId] = useState<string | null>(null);
+  const [editingKbEnterpriseId, setEditingKbEnterpriseId] = useState<string | null>(null);
+
   // Copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -107,8 +127,22 @@ export default function SettingsPage() {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const visibleTabs = isSuperAdmin ? ADMIN_TABS : USER_TABS;
 
+  const loadKbEntries = useCallback(async () => {
+    if (!token) return;
+    try {
+      const entries = await knowledgeBaseApi.getMine(token);
+      setKbEntries(entries);
+      if (isSuperAdmin) {
+        const enterprise = await knowledgeBaseApi.getEnterprise(token);
+        setKbEnterpriseEntries(enterprise);
+      }
+    } catch { /* ignore */ }
+  }, [token, isSuperAdmin]);
+
   const loadSettings = useCallback(async () => {
     if (!token || !user) return;
+
+    loadKbEntries();
 
     if (!isSuperAdmin) {
       setLoading(false);
@@ -176,14 +210,14 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, user, isSuperAdmin]);
+  }, [token, user, isSuperAdmin, loadKbEntries]);
 
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
 
   useEffect(() => {
-    if (!isSuperAdmin && activeTab !== 'preferences') {
+    if (!isSuperAdmin && activeTab !== 'preferences' && activeTab !== 'kb') {
       setActiveTab('preferences');
     }
   }, [isSuperAdmin, activeTab]);
@@ -649,8 +683,8 @@ export default function SettingsPage() {
                   {AI_PROVIDERS.map((provider) => (
                     <button
                       key={provider.id}
-                      onClick={() => setAi({ ...ai, provider: provider.id, model: provider.models[0] })}
-                      className={`rounded-lg p-4 text-left transition-colors ${
+                      onClick={() => setAi({ ...ai, provider: provider.id, model: provider.models[0] || '' })}
+                      className={`rounded-lg p-4 text-left transition-colors cursor-pointer ${
                         ai.provider === provider.id
                           ? 'bg-primary/10'
                           : 'bg-secondary hover:bg-secondary/70'
@@ -676,16 +710,20 @@ export default function SettingsPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Modèle</Label>
-                      <Select value={ai.model} onValueChange={(val) => { if (val) setAi({ ...ai, model: val }); }}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {AI_PROVIDERS.find((p) => p.id === ai.provider)?.models.map((m) => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {AI_PROVIDERS.find((p) => p.id === ai.provider)?.models.length === 0 ? (
+                        <Input value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} placeholder="ex: anthropic/claude-sonnet-4-6" />
+                      ) : (
+                        <Select value={ai.model} onValueChange={(val) => { if (val) setAi({ ...ai, model: val }); }}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AI_PROVIDERS.find((p) => p.id === ai.provider)?.models.map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   </div>
                 )}
@@ -873,6 +911,156 @@ export default function SettingsPage() {
                 Sauvegarder
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ===== TAB: Ma base de connaissances ===== */}
+      {activeTab === 'kb' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Ma base de connaissances</CardTitle>
+                <CardDescription>Fiches et documents personnels utilisés comme contexte par l&apos;IA</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = '.md,.txt'; input.onchange = async (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file && token) { try { await knowledgeBaseApi.uploadMine(file, token); loadKbEntries(); showSuccess('Fichier importé'); } catch { setError('Échec de l\'import'); } } }; input.click(); }}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Importer
+                </Button>
+                <Button size="sm" onClick={() => { setShowKbForm(true); setKbForm({ title: '', content: '' }); setEditingKbId(null); }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Ajouter
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {showKbForm && (
+              <div className="space-y-3 rounded-lg border p-4">
+                <Input placeholder="Titre de la fiche" value={kbForm.title} onChange={(e) => setKbForm({ ...kbForm, title: e.target.value })} />
+                <textarea className="w-full min-h-[120px] rounded-lg border bg-transparent p-3 text-sm resize-y focus:outline-none focus:ring-1 focus:ring-ring" placeholder="Contenu (markdown supporté)" value={kbForm.content} onChange={(e) => setKbForm({ ...kbForm, content: e.target.value })} />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setShowKbForm(false); setEditingKbId(null); }}>Annuler</Button>
+                  <Button size="sm" disabled={!kbForm.title.trim()} onClick={async () => {
+                    if (!token) return;
+                    try {
+                      if (editingKbId) { await knowledgeBaseApi.update(editingKbId, kbForm, token); }
+                      else { await knowledgeBaseApi.createMine(kbForm, token); }
+                      loadKbEntries(); setShowKbForm(false); setEditingKbId(null); showSuccess(editingKbId ? 'Fiche modifiée' : 'Fiche créée');
+                    } catch { setError('Erreur lors de la sauvegarde'); }
+                  }}>{editingKbId ? 'Modifier' : 'Créer'}</Button>
+                </div>
+              </div>
+            )}
+
+            {kbEntries.length === 0 && !showKbForm && (
+              <div className="text-center py-8 text-muted-foreground">
+                <BookOpen className="mx-auto h-8 w-8 mb-2 opacity-50" />
+                <p className="text-sm">Aucune fiche personnelle</p>
+                <p className="text-xs mt-1">Ajoutez des fiches pour enrichir le contexte IA</p>
+              </div>
+            )}
+
+            {kbEntries.map((entry) => (
+              <div key={entry.id} className="flex items-start justify-between rounded-lg border p-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm truncate">{entry.title}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${entry.type === 'file' ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                      {entry.type === 'file' ? entry.fileName : 'texte'}
+                    </span>
+                  </div>
+                  {entry.content && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{entry.content.slice(0, 200)}</p>}
+                </div>
+                <div className="flex gap-1 ml-2">
+                  {entry.type === 'text' && (
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setKbForm({ title: entry.title, content: entry.content }); setEditingKbId(entry.id); setShowKbForm(true); }}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={async () => { if (!token) return; try { await knowledgeBaseApi.remove(entry.id, token); loadKbEntries(); showSuccess('Fiche supprimée'); } catch { setError('Erreur lors de la suppression'); } }}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ===== TAB: KB Entreprise ===== */}
+      {isSuperAdmin && activeTab === 'kb-enterprise' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Base de connaissances entreprise</CardTitle>
+                <CardDescription>Partagée avec tous les utilisateurs comme contexte IA</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = '.md,.txt'; input.onchange = async (e) => { const file = (e.target as HTMLInputElement).files?.[0]; if (file && token) { try { await knowledgeBaseApi.uploadEnterprise(file, token); loadKbEntries(); showSuccess('Fichier importé'); } catch { setError('Échec de l\'import'); } } }; input.click(); }}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Importer
+                </Button>
+                <Button size="sm" onClick={() => { setShowKbEnterpriseForm(true); setKbEnterpriseForm({ title: '', content: '' }); setEditingKbEnterpriseId(null); }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Ajouter
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {showKbEnterpriseForm && (
+              <div className="space-y-3 rounded-lg border p-4">
+                <Input placeholder="Titre de la fiche" value={kbEnterpriseForm.title} onChange={(e) => setKbEnterpriseForm({ ...kbEnterpriseForm, title: e.target.value })} />
+                <textarea className="w-full min-h-[120px] rounded-lg border bg-transparent p-3 text-sm resize-y focus:outline-none focus:ring-1 focus:ring-ring" placeholder="Contenu (markdown supporté)" value={kbEnterpriseForm.content} onChange={(e) => setKbEnterpriseForm({ ...kbEnterpriseForm, content: e.target.value })} />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setShowKbEnterpriseForm(false); setEditingKbEnterpriseId(null); }}>Annuler</Button>
+                  <Button size="sm" disabled={!kbEnterpriseForm.title.trim()} onClick={async () => {
+                    if (!token) return;
+                    try {
+                      if (editingKbEnterpriseId) { await knowledgeBaseApi.update(editingKbEnterpriseId, kbEnterpriseForm, token); }
+                      else { await knowledgeBaseApi.createEnterprise(kbEnterpriseForm, token); }
+                      loadKbEntries(); setShowKbEnterpriseForm(false); setEditingKbEnterpriseId(null); showSuccess(editingKbEnterpriseId ? 'Fiche modifiée' : 'Fiche créée');
+                    } catch { setError('Erreur lors de la sauvegarde'); }
+                  }}>{editingKbEnterpriseId ? 'Modifier' : 'Créer'}</Button>
+                </div>
+              </div>
+            )}
+
+            {kbEnterpriseEntries.length === 0 && !showKbEnterpriseForm && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Library className="mx-auto h-8 w-8 mb-2 opacity-50" />
+                <p className="text-sm">Aucune fiche entreprise</p>
+                <p className="text-xs mt-1">Ajoutez des méthodologies, templates ou références partagées</p>
+              </div>
+            )}
+
+            {kbEnterpriseEntries.map((entry) => (
+              <div key={entry.id} className="flex items-start justify-between rounded-lg border p-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm truncate">{entry.title}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${entry.type === 'file' ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                      {entry.type === 'file' ? entry.fileName : 'texte'}
+                    </span>
+                  </div>
+                  {entry.content && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{entry.content.slice(0, 200)}</p>}
+                </div>
+                <div className="flex gap-1 ml-2">
+                  {entry.type === 'text' && (
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setKbEnterpriseForm({ title: entry.title, content: entry.content }); setEditingKbEnterpriseId(entry.id); setShowKbEnterpriseForm(true); }}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={async () => { if (!token) return; try { await knowledgeBaseApi.remove(entry.id, token); loadKbEntries(); showSuccess('Fiche supprimée'); } catch { setError('Erreur lors de la suppression'); } }}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}

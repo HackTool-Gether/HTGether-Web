@@ -918,6 +918,8 @@ export interface KanbanConfig {
 export interface ProjectDetail extends Project {
   rolePermissions?: Record<string, Record<string, boolean>>;
   kanbanConfig?: KanbanConfig;
+  aiEnabled?: boolean;
+  aiScopeIds?: string[];
   scopes: Scope[];
 }
 
@@ -1188,3 +1190,90 @@ export const statsApi = {
   getProjectStats: (projectId: string, token: string) =>
     apiRequest<ProjectStats>(`/projects/${projectId}/stats`, { token }),
 };
+
+// ==================== Knowledge Base ====================
+
+export interface KBEntry {
+  id: string;
+  title: string;
+  content: string;
+  type: 'text' | 'file';
+  scope: 'enterprise' | 'user';
+  fileName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const knowledgeBaseApi = {
+  getEnterprise: (token: string) =>
+    apiRequest<KBEntry[]>('/knowledge-base/enterprise', { token }),
+
+  createEnterprise: (data: { title: string; content: string }, token: string) =>
+    apiRequest<KBEntry>('/knowledge-base/enterprise', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  uploadEnterprise: async (file: File, token: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/knowledge-base/enterprise/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: 'Upload failed' }));
+      throw new ApiError(error.message, res.status);
+    }
+    return res.json() as Promise<KBEntry>;
+  },
+
+  getMine: (token: string) =>
+    apiRequest<KBEntry[]>('/knowledge-base/mine', { token }),
+
+  createMine: (data: { title: string; content: string }, token: string) =>
+    apiRequest<KBEntry>('/knowledge-base/mine', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  uploadMine: async (file: File, token: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/knowledge-base/mine/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: 'Upload failed' }));
+      throw new ApiError(error.message, res.status);
+    }
+    return res.json() as Promise<KBEntry>;
+  },
+
+  update: (id: string, data: { title?: string; content?: string }, token: string) =>
+    apiRequest<KBEntry>(`/knowledge-base/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  remove: (id: string, token: string) =>
+    apiRequest<void>(`/knowledge-base/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
+// ==================== AI ====================
+
+export interface AiGenerateRequest {
+  content: string;
+  images?: string[];
+  projectId?: string;
+  action: 'reformulate' | 'generate' | 'complete';
+}

@@ -301,6 +301,7 @@ export default function FindingEditPage() {
                 value={description}
                 onChange={setDescription}
                 placeholder="Décrivez la vulnérabilité, le contexte, le composant impacté…"
+                projectId={projectId}
               />
             )}
             {tab === 'reproduction' && (
@@ -308,6 +309,7 @@ export default function FindingEditPage() {
                 value={proof}
                 onChange={setProof}
                 placeholder="Étapes de reproduction, requêtes, payloads…"
+                projectId={projectId}
               />
             )}
             {tab === 'impact' && (
@@ -318,6 +320,7 @@ export default function FindingEditPage() {
                     value={impact}
                     onChange={setImpact}
                     placeholder="Quels sont les impacts métier / techniques ?"
+                    projectId={projectId}
                   />
                 </div>
                 <div>
@@ -326,6 +329,7 @@ export default function FindingEditPage() {
                     value={remediation}
                     onChange={setRemediation}
                     placeholder="Recommandations pour corriger…"
+                    projectId={projectId}
                   />
                 </div>
               </div>
@@ -440,9 +444,10 @@ interface FindingEditorProps {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  projectId?: string;
 }
 
-function FindingEditor({ value, onChange, placeholder }: FindingEditorProps) {
+function FindingEditor({ value, onChange, placeholder, projectId }: FindingEditorProps) {
   return (
     <div
       style={{
@@ -457,6 +462,7 @@ function FindingEditor({ value, onChange, placeholder }: FindingEditorProps) {
         onChange={onChange}
         placeholder={placeholder}
         storageMode="json"
+        projectId={projectId}
       />
     </div>
   );

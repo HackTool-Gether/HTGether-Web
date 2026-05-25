@@ -35,7 +35,10 @@ import {
   ListChecks,
   Send,
   MessageSquare,
+  Brain,
+  CheckSquare,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 const AUDIT_LABELS: Record<string, string> = {
   WEB: 'Web', INTERNAL_AD: 'Active Directory', LINUX: 'Linux', MOBILE: 'Mobile', OTHER: 'Autre',
@@ -757,6 +760,67 @@ export default function ProjectDetailPage() {
                   <div className="flex justify-between"><span className="text-muted-foreground">En cours</span><span className="font-mono">{stats.scopes.inProgress}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Non démarrés</span><span className="font-mono">{stats.scopes.notStarted}</span></div>
                 </div>
+              </div>
+            )}
+
+            {/* AI config */}
+            {isManager && project && (
+              <div className="rounded-xl bg-card p-4">
+                <div className="cap mb-2.5 flex items-center gap-1.5">
+                  <Brain size={11} />
+                  Intelligence Artificielle
+                </div>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs font-medium">Activer l&apos;IA pour ce projet</p>
+                    <p className="text-[10.5px] text-muted-foreground">L&apos;IA aura accès aux notes des scopes sélectionnés</p>
+                  </div>
+                  <Switch
+                    checked={project.aiEnabled ?? false}
+                    onCheckedChange={async (checked) => {
+                      if (!token) return;
+                      try {
+                        await projectsApi.update(project.id, { aiEnabled: checked } as any, token);
+                        setProject({ ...project, aiEnabled: checked });
+                      } catch { /* ignore */ }
+                    }}
+                  />
+                </div>
+                {project.aiEnabled && project.scopes.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10.5px] text-muted-foreground uppercase tracking-wider">Scopes accessibles par l&apos;IA</p>
+                    {project.scopes.map((scope) => {
+                      const aiScopeIds = (project.aiScopeIds ?? []) as string[];
+                      const allSelected = aiScopeIds.length === 0;
+                      const isSelected = allSelected || aiScopeIds.includes(scope.id);
+                      return (
+                        <button
+                          key={scope.id}
+                          className={`flex items-center gap-2 w-full rounded-lg border px-3 py-1.5 text-xs transition-colors cursor-pointer ${isSelected ? 'border-primary/30 bg-primary/5' : 'border-border opacity-50'}`}
+                          onClick={async () => {
+                            if (!token) return;
+                            let newIds: string[];
+                            if (allSelected) {
+                              newIds = project.scopes.filter((s) => s.id !== scope.id).map((s) => s.id);
+                            } else if (isSelected) {
+                              newIds = aiScopeIds.filter((id) => id !== scope.id);
+                            } else {
+                              newIds = [...aiScopeIds, scope.id];
+                            }
+                            if (newIds.length === project.scopes.length) newIds = [];
+                            try {
+                              await projectsApi.update(project.id, { aiScopeIds: newIds } as any, token);
+                              setProject({ ...project, aiScopeIds: newIds });
+                            } catch { /* ignore */ }
+                          }}
+                        >
+                          <CheckSquare size={12} className={isSelected ? 'text-primary' : 'text-muted-foreground'} />
+                          {scope.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

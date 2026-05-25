@@ -46,6 +46,7 @@ const STEPS = [
 ] as const;
 
 const AI_PROVIDERS = [
+  { id: 'openrouter', name: 'OpenRouter', description: 'Tous les modèles', models: [] as string[] },
   { id: 'openai', name: 'OpenAI', description: 'GPT-4, GPT-4o', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'] },
   { id: 'anthropic', name: 'Anthropic', description: 'Claude 4', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'] },
   { id: 'gemini', name: 'Google Gemini', description: 'Gemini Pro, Ultra', models: ['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-pro'] },
@@ -590,7 +591,7 @@ export default function SetupPage() {
                         <button
                           key={provider.id}
                           type="button"
-                          onClick={() => setAi({ ...ai, provider: provider.id, model: provider.models[0] })}
+                          onClick={() => setAi({ ...ai, provider: provider.id, model: provider.models[0] || '' })}
                           style={{
                             padding: 16, textAlign: 'left', borderRadius: 'var(--r-lg)',
                             background: ai.provider === provider.id ? 'var(--accent-tint)' : 'var(--bg-elevated)',
@@ -610,16 +611,20 @@ export default function SetupPage() {
                           <Input type="password" value={ai.apiKey} onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} placeholder={`Clé API ${AI_PROVIDERS.find((p) => p.id === ai.provider)?.name}`} className={inputClass} />
                         </FieldGroup>
                         <FieldGroup label="Modèle">
-                          <Select value={ai.model} onValueChange={(val) => { if (val) setAi({ ...ai, model: val }); }}>
-                            <SelectTrigger className="w-full h-10">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {AI_PROVIDERS.find((p) => p.id === ai.provider)?.models.map((m) => (
-                                <SelectItem key={m} value={m}>{m}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {AI_PROVIDERS.find((p) => p.id === ai.provider)?.models.length === 0 ? (
+                            <Input value={ai.model} onChange={(e) => setAi({ ...ai, model: e.target.value })} placeholder="ex: anthropic/claude-sonnet-4-6" className={inputClass} />
+                          ) : (
+                            <Select value={ai.model} onValueChange={(val) => { if (val) setAi({ ...ai, model: val }); }}>
+                              <SelectTrigger className="w-full h-10">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {AI_PROVIDERS.find((p) => p.id === ai.provider)?.models.map((m) => (
+                                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </FieldGroup>
                       </div>
                     )}
