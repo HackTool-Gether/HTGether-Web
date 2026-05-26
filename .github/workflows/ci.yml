@@ -23,9 +23,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Generate Prisma Client
-        run: npm run db:generate
-
       - name: Lint
         run: npm run lint
 
@@ -67,9 +64,6 @@ jobs:
           cache: npm
 
       - run: npm ci
-
-      - name: Generate Prisma Client
-        run: npm run db:generate
 
       - name: Build
         run: npm run build
