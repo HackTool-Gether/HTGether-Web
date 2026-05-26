@@ -201,21 +201,19 @@ export default function FindingsListPage() {
             })}
           </div>
 
-          {authors.length > 1 && (
-            <Select value={authorFilter} onValueChange={(v) => setAuthorFilter(v ?? 'all')}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
-                <SelectValue placeholder="Tous les membres" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les membres</SelectItem>
-                {authors.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.firstName} {a.lastName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Select value={authorFilter} onValueChange={(v) => setAuthorFilter(v ?? 'all')}>
+            <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectValue placeholder="Tous les membres" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les membres</SelectItem>
+              {authors.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.firstName} {a.lastName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {error && (
@@ -295,8 +293,7 @@ export default function FindingsListPage() {
                 return (
                   <div
                     key={f.id}
-                    onClick={() => setSelected(f.id)}
-                    onDoubleClick={() => router.push(`/dashboard/projects/${projectId}/findings/${f.id}`)}
+                    onClick={() => router.push(`/dashboard/projects/${projectId}/findings/${f.id}`)}
                     className="grid gap-3 px-4 py-2.5 items-center cursor-pointer transition-colors relative text-sm"
                     style={{
                       gridTemplateColumns: '100px 80px 1fr 60px 100px 110px 80px',
