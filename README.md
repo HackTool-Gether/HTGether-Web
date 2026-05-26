@@ -31,27 +31,29 @@ rapports avec templates, chat temps reel et assistance IA.
 
 ### Prerequis
 
-- Node.js 20+
+- Docker + Docker Compose (recommande)
+- Ou Node.js 20+ (pour le developpement local)
 - L'API HTGether-API doit tourner (`http://localhost:4000`)
 
-### Installation
+### Lancement rapide (Docker)
+
+```bash
+docker compose up -d    # frontend sur http://localhost:3000
+```
+
+Par defaut l'API est attendue sur `http://localhost:4000/api`.
+Pour changer, modifier le `build.args` dans `docker-compose.yml`.
+
+### Developpement local
 
 ```bash
 npm ci
-```
 
-### Configuration
+# Creer le fichier de configuration
+echo 'NEXT_PUBLIC_API_URL=http://localhost:4000/api' > .env.local
 
-Creer un fichier `.env.local` a la racine :
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:4000/api
-```
-
-### Lancement
-
-```bash
-npm run dev     # Serveur de dev sur http://localhost:3000
+# Lancer le serveur de dev
+npm run dev     # http://localhost:3000
 ```
 
 ### Commandes utiles
