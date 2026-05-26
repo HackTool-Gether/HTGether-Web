@@ -1,0 +1,24 @@
+name: Bearer (SAST + PII)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  bearer:
+    name: Bearer scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bearer scan
+        uses: bearer/bearer-action@v2
+        with:
+          severity: critical,high

@@ -22,20 +22,33 @@
 - `npm run dev` — Start dev server (port 3000)
 - `npx next build` — Production build (also used by pre-commit)
 
-## MANDATORY — Before every commit
+## MANDATORY — Pre-commit checklist (BLOCKING)
 
-These steps are NON-NEGOTIABLE. A commit that breaks CI is unacceptable.
+**This section is the single most important rule in this file.**
+You MUST run ALL 4 checks below before EVERY `git commit`. No exceptions.
 
-1. **Pre-commit hooks** — Run `pre-commit run --all-files`.
-   Fix ALL failures (trailing whitespace, EOF, yamllint, markdownlint,
-   gitleaks, large files, build). Do NOT commit until every hook passes.
-2. **Grype SCA scan** — Run `grype dir:. --fail-on high`.
-   If any High or Critical vulnerability is found, fix it
-   (update dependency, add npm override in package.json) BEFORE committing.
-   Medium/Low are acceptable.
-3. **Build check** — Run `npx next build` to verify no build errors.
+```bash
+# 1. Pre-commit hooks (linting, secrets, formatting, build)
+pre-commit run --all-files
 
-If any of these 3 checks fail, DO NOT commit. Fix the issue first.
+# 2. Grype SCA scan (dependency vulnerabilities)
+grype dir:. --fail-on high
+
+# 3. Bearer SAST scan (code-level security issues)
+bearer scan . --severity critical,high
+
+# 4. Build check
+npx next build
+```
+
+**If ANY check fails, DO NOT commit. Fix the issue first, then re-run.**
+
+- Grype High/Critical → update dependency or add npm override in `package.json`
+- Bearer Critical/High → fix the flagged code pattern
+- Medium/Low from grype or bearer are acceptable
+- Pre-commit failures → fix and re-run until all pass
+
+This is not a suggestion — it is a hard gate.
 
 ## Code conventions
 
