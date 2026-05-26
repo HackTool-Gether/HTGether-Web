@@ -69,10 +69,10 @@ type TabId = 'preferences' | 'company' | 'auth' | 'ai' | 'email' | 'kb' | 'kb-en
 
 const AI_PROVIDERS = [
   { id: 'openrouter', name: 'OpenRouter', description: 'Tous les modèles', models: [] as string[] },
-  { id: 'openai', name: 'OpenAI', description: 'GPT-4, GPT-4o', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'] },
-  { id: 'anthropic', name: 'Anthropic', description: 'Claude 4', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'] },
-  { id: 'gemini', name: 'Google Gemini', description: 'Gemini Pro, Ultra', models: ['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-pro'] },
-  { id: 'mistral', name: 'Mistral AI', description: 'Mistral Large, Medium', models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'] },
+  { id: 'openai', name: 'OpenAI', description: 'GPT-4o, GPT-5', models: ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o', 'gpt-4o-mini', 'o3', 'o3-mini', 'o4-mini'] },
+  { id: 'anthropic', name: 'Anthropic', description: 'Claude 4', models: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'] },
+  { id: 'gemini', name: 'Google Gemini', description: 'Gemini 2.5, 2.0', models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-pro'] },
+  { id: 'mistral', name: 'Mistral AI', description: 'Mistral Large, Medium', models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest', 'codestral-latest'] },
 ];
 
 const SSO_PRESETS = [
