@@ -1,0 +1,23 @@
+# Reverse-proxy HTTPS portable pour HTGether (on-premise).
+#
+# Sert le frontend et l'API derrière un seul port 443 en TLS.
+# Par défaut, `tls internal` génère une autorité de certification locale
+# auto-signée (aucun certificat externe requis, fonctionne hors-ligne).
+#
+# Pour un vrai domaine public, remplacer `:443` par le domaine (ex.
+# `htgether.example.com`) et retirer `tls internal` : Caddy obtiendra
+# automatiquement un certificat Let's Encrypt.
+
+:443 {
+	tls internal
+
+	# Requêtes API → backend NestJS (port 4000)
+	handle /api/* {
+		reverse_proxy localhost:4000
+	}
+
+	# Tout le reste → frontend Next.js (port 3000)
+	handle {
+		reverse_proxy localhost:3000
+	}
+}

@@ -1,0 +1,22 @@
+# Surcouche HTTPS optionnelle — reverse-proxy Caddy devant le frontend + l'API.
+#
+# Lancement (le frontend et l'API doivent déjà tourner) :
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+#
+# L'application est alors accessible sur https://localhost (TLS auto-signé).
+# Pensez à builder le frontend avec NEXT_PUBLIC_API_URL=https://localhost/api
+# et à ajouter https://localhost à CORS_ORIGIN côté API.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

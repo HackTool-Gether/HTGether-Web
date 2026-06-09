@@ -71,6 +71,20 @@ npx tsc --noEmit   # Type-check
 2. L'application redirige vers `/setup` (compte super admin)
 3. Puis `/onboarding` (entreprise, auth, IA)
 
+### HTTPS (optionnel, on-premise)
+
+Un reverse-proxy Caddy sert le front + l'API derriere le port 443
+en TLS auto-signe (autorite locale, aucun certificat externe) :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+```
+
+L'app est alors sur `https://localhost`. Builder le front avec
+`NEXT_PUBLIC_API_URL=https://localhost/api` et ajouter `https://localhost`
+a `CORS_ORIGIN` cote API. Pour un vrai domaine, remplacer `:443` par le
+domaine dans `reverse-proxy/Caddyfile` (HTTPS automatique Let's Encrypt).
+
 ## 3. Pipeline DevSecOps
 
 Chaque commit passe par **4 couches de verification** avant
