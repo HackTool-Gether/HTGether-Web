@@ -41,15 +41,23 @@ import {
 import { Switch } from '@/components/ui/switch';
 
 const AUDIT_LABELS: Record<string, string> = {
-  WEB: 'Web', INTERNAL_AD: 'Active Directory', LINUX: 'Linux', MOBILE: 'Mobile', OTHER: 'Autre',
+  APP_PENTEST: "Test d'intrusion applicatif",
+  EXTERNAL_PENTEST: "Test d'intrusion externe",
+  INTERNAL_PENTEST: "Test d'intrusion interne",
+  CODE_AUDIT: 'Audit de code',
+  ARCHITECTURE_AUDIT: "Audit d'architecture",
+  CONFIG_AUDIT: 'Audit de configuration',
+  CLOUD_CONFIG_AUDIT: 'Audit de configuration Cloud',
 };
 
 const AUDIT_OPTIONS: { value: AuditType; label: string }[] = [
-  { value: 'WEB', label: 'Web' },
-  { value: 'INTERNAL_AD', label: 'Active Directory' },
-  { value: 'LINUX', label: 'Linux' },
-  { value: 'MOBILE', label: 'Mobile' },
-  { value: 'OTHER', label: 'Autre' },
+  { value: 'APP_PENTEST', label: "Test d'intrusion applicatif" },
+  { value: 'EXTERNAL_PENTEST', label: "Test d'intrusion externe" },
+  { value: 'INTERNAL_PENTEST', label: "Test d'intrusion interne" },
+  { value: 'CODE_AUDIT', label: 'Audit de code' },
+  { value: 'ARCHITECTURE_AUDIT', label: "Audit d'architecture" },
+  { value: 'CONFIG_AUDIT', label: 'Audit de configuration' },
+  { value: 'CLOUD_CONFIG_AUDIT', label: 'Audit de configuration Cloud' },
 ];
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
@@ -132,7 +140,7 @@ export default function ProjectDetailPage() {
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState<EditForm>({
     name: '', clientCompany: '', clientNeed: '', context: '',
-    startDate: '', endDate: '', auditType: 'WEB', status: 'DRAFT',
+    startDate: '', endDate: '', auditType: 'APP_PENTEST', status: 'DRAFT',
   });
   const [remarkText, setRemarkText] = useState('');
   const [sendingRemark, setSendingRemark] = useState(false);

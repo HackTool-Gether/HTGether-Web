@@ -953,7 +953,14 @@ export interface AllowedDomain {
 }
 
 export type ProjectStatus = 'DRAFT' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DELIVERED' | 'ARCHIVED';
-export type AuditType = 'WEB' | 'INTERNAL_AD' | 'LINUX' | 'MOBILE' | 'OTHER';
+export type AuditType =
+  | 'APP_PENTEST'
+  | 'EXTERNAL_PENTEST'
+  | 'INTERNAL_PENTEST'
+  | 'CODE_AUDIT'
+  | 'ARCHITECTURE_AUDIT'
+  | 'CONFIG_AUDIT'
+  | 'CLOUD_CONFIG_AUDIT';
 export type ScopeStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'IN_REVIEW';
 
 export interface ProjectMember {

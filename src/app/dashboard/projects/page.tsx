@@ -18,16 +18,18 @@ import {
 } from '@/components/ui/select';
 import {
   Plus, X, Loader2, Search,
-  Globe, Server, Terminal, Smartphone, MoreHorizontal,
+  Globe, Server, Network, Code, Boxes, Settings, Cloud, MoreHorizontal,
   Calendar, Building2, FolderOpen,
 } from 'lucide-react';
 
 const AUDIT_TYPES: { value: AuditType; label: string; icon: typeof Globe }[] = [
-  { value: 'WEB', label: 'Web', icon: Globe },
-  { value: 'INTERNAL_AD', label: 'Active Directory', icon: Server },
-  { value: 'LINUX', label: 'Linux', icon: Terminal },
-  { value: 'MOBILE', label: 'Mobile', icon: Smartphone },
-  { value: 'OTHER', label: 'Autre', icon: MoreHorizontal },
+  { value: 'APP_PENTEST', label: "Test d'intrusion applicatif", icon: Globe },
+  { value: 'EXTERNAL_PENTEST', label: "Test d'intrusion externe", icon: Network },
+  { value: 'INTERNAL_PENTEST', label: "Test d'intrusion interne", icon: Server },
+  { value: 'CODE_AUDIT', label: 'Audit de code', icon: Code },
+  { value: 'ARCHITECTURE_AUDIT', label: "Audit d'architecture", icon: Boxes },
+  { value: 'CONFIG_AUDIT', label: 'Audit de configuration', icon: Settings },
+  { value: 'CLOUD_CONFIG_AUDIT', label: 'Audit de configuration Cloud', icon: Cloud },
 ];
 
 const STATUS_LABEL: Record<ProjectStatus, string> = {
@@ -88,7 +90,7 @@ export default function ProjectsPage() {
     context: '',
     startDate: '',
     endDate: '',
-    auditType: 'WEB' as AuditType,
+    auditType: 'APP_PENTEST' as AuditType,
   });
 
   useEffect(() => {
@@ -119,7 +121,7 @@ export default function ProjectsPage() {
       setShowCreate(false);
       setForm({
         name: '', clientCompany: '', clientNeed: '', context: '',
-        startDate: '', endDate: '', auditType: 'WEB',
+        startDate: '', endDate: '', auditType: 'APP_PENTEST',
       });
       refreshProjects();
       router.push(`/dashboard/projects/${project.id}`);
