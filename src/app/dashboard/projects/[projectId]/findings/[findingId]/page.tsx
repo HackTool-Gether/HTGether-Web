@@ -43,7 +43,7 @@ export default function FindingEditPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const findingId = params.findingId as string;
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { setActiveProject } = useShell();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -65,6 +65,14 @@ export default function FindingEditPage() {
   const [cvssScore, setCvssScore] = useState<string>('');
   const [cvssVector, setCvssVector] = useState<string>('');
   const [tags, setTags] = useState<string>('');
+
+  // Horizontal partitioning (cloisonnement) — a PENTESTER may only edit their
+  // own findings. MANAGER and SUPER_ADMIN can edit any; CLIENT is read-only.
+  const myRole = project?.members.find((m) => m.user.id === user?.id)?.role;
+  const canEdit =
+    user?.role === 'SUPER_ADMIN' ||
+    myRole === 'MANAGER' ||
+    (myRole === 'PENTESTER' && finding?.authorId === user?.id);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -137,7 +145,7 @@ export default function FindingEditPage() {
 
   // Auto-save 1.5s after last edit
   useEffect(() => {
-    if (!finding) return;
+    if (!finding || !canEdit) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => persist(), 1500);
     return () => {
@@ -218,19 +226,36 @@ export default function FindingEditPage() {
             {saveState === 'saved' && '✓ enregistré'}
             {saveState === 'error' && 'erreur'}
           </span>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={handleDelete} title="Supprimer">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          {canEdit && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={handleDelete} title="Supprimer">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Main */}
         <div className="flex-1 min-w-0 flex flex-col">
+          {!canEdit && (
+            <div
+              className="mx-4 sm:mx-8 mb-3"
+              style={{
+                fontSize: 12,
+                color: 'var(--fg-muted)',
+                background: 'var(--bg-subtle)',
+                borderRadius: 'var(--r-sm)',
+                padding: '8px 12px',
+              }}
+            >
+              Lecture seule — vous ne pouvez modifier que les findings dont vous êtes l’auteur.
+            </div>
+          )}
           <div className="px-4 sm:px-8 pb-3">
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              readOnly={!canEdit}
               placeholder="Titre du finding"
               style={{
                 width: '100%',
@@ -311,6 +336,7 @@ export default function FindingEditPage() {
                 onChange={setDescription}
                 placeholder="Décrivez la vulnérabilité, le contexte, le composant impacté…"
                 projectId={projectId}
+                editable={canEdit}
               />
             )}
             {tab === 'reproduction' && (
@@ -319,6 +345,7 @@ export default function FindingEditPage() {
                 onChange={setProof}
                 placeholder="Preuve de concept : étapes, requêtes, payloads…"
                 projectId={projectId}
+                editable={canEdit}
               />
             )}
             {tab === 'impact' && (
@@ -330,15 +357,17 @@ export default function FindingEditPage() {
                     onChange={setImpact}
                     placeholder="Quels sont les impacts métier / techniques ?"
                     projectId={projectId}
+                    editable={canEdit}
                   />
                 </div>
                 <div>
-                  <div className="cap" style={{ marginBottom: 6 }}>Remédiation</div>
+                  <div className="cap" style={{ marginBottom: 6 }}>Recommandations</div>
                   <FindingEditor
                     value={remediation}
                     onChange={setRemediation}
                     placeholder="Recommandations pour corriger…"
                     projectId={projectId}
+                    editable={canEdit}
                   />
                 </div>
               </div>
@@ -371,6 +400,7 @@ export default function FindingEditPage() {
                 <button
                   key={s}
                   type="button"
+                  disabled={!canEdit}
                   onClick={() => handleSeverityChange(s)}
                   style={{
                     padding: '6px 0',
@@ -381,7 +411,7 @@ export default function FindingEditPage() {
                     fontSize: 10.5,
                     fontFamily: 'var(--font-mono)',
                     textTransform: 'uppercase',
-                    cursor: 'pointer',
+                    cursor: canEdit ? 'pointer' : 'default',
                   }}
                   title={s}
                 >
@@ -396,6 +426,7 @@ export default function FindingEditPage() {
           <select
             className="input"
             value={status}
+            disabled={!canEdit}
             onChange={(e) => handleStatusChange(e.target.value as FindingStatus)}
             style={{ marginBottom: 16 }}
           >
@@ -411,16 +442,41 @@ export default function FindingEditPage() {
           <input
             className="input mono"
             value={cvssVector}
+            readOnly={!canEdit}
             onChange={(e) => setCvssVector(e.target.value)}
             placeholder="CVSS:3.1/AV:N/AC:L/…"
             style={{ fontSize: 11, marginBottom: 8 }}
           />
-          <CvssCalculator vector={cvssVector} onChange={handleCvssChange} />
+          {canEdit && <CvssCalculator vector={cvssVector} onChange={handleCvssChange} />}
           <div style={{ marginBottom: 16 }} />
 
           {/* Tags */}
           <div className="cap" style={{ marginBottom: 8 }}>Tags</div>
-          <TagInput value={tags} onChange={setTags} />
+          {canEdit ? (
+            <TagInput value={tags} onChange={setTags} />
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {tags
+                .split(',')
+                .map((t) => t.trim())
+                .filter(Boolean)
+                .map((t) => (
+                  <span
+                    key={t}
+                    className="mono"
+                    style={{
+                      padding: '2px 6px',
+                      background: 'var(--bg-subtle)',
+                      borderRadius: 'var(--r-sm)',
+                      fontSize: 10.5,
+                      color: 'var(--fg-muted)',
+                    }}
+                  >
+                    {t}
+                  </span>
+                ))}
+            </div>
+          )}
         </aside>
       </div>
     </div>
@@ -432,9 +488,10 @@ interface FindingEditorProps {
   onChange: (v: string) => void;
   placeholder?: string;
   projectId?: string;
+  editable?: boolean;
 }
 
-function FindingEditor({ value, onChange, placeholder, projectId }: FindingEditorProps) {
+function FindingEditor({ value, onChange, placeholder, projectId, editable = true }: FindingEditorProps) {
   return (
     <div
       style={{
@@ -450,6 +507,7 @@ function FindingEditor({ value, onChange, placeholder, projectId }: FindingEdito
         placeholder={placeholder}
         storageMode="json"
         projectId={projectId}
+        editable={editable}
       />
     </div>
   );

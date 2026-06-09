@@ -790,11 +790,12 @@ interface RichTextEditorProps {
   extraSlashItems?: SlashItem[];
   storageMode?: 'html' | 'json';
   projectId?: string;
+  editable?: boolean;
 }
 
 export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
   function RichTextEditor(
-    { content, onChange, placeholder, extraExtensions = [], extraSlashItems = [], storageMode = 'html', projectId },
+    { content, onChange, placeholder, extraExtensions = [], extraSlashItems = [], storageMode = 'html', projectId, editable = true },
     ref,
   ) {
     // AI generation
@@ -968,6 +969,7 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
         ...extraExtensions,
       ],
       content: parseInitialContent(content, storageMode),
+      editable,
       immediatelyRender: false,
       onUpdate: ({ editor: e }) => {
         onChange(storageMode === 'json' ? JSON.stringify(e.getJSON()) : e.getHTML());
