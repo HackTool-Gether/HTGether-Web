@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { templatesApi, ApiError, type ReportTemplate, type LibraryTemplate } from '@/lib/api';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   Loader2, Plus, Copy, Trash2, FileText, Star, Library, Download, X,
   Shield, Monitor, Globe, Smartphone, Search, Cpu, Cloud, Wifi, Users,
-  Code2,
+  Code2, Upload,
 } from 'lucide-react';
 
 const CATEGORY_META: Record<string, { label: string; icon: typeof Shield; color: string }> = {
@@ -37,6 +37,8 @@ export default function TemplatesPage() {
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [importingJson, setImportingJson] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -115,6 +117,77 @@ export default function TemplatesPage() {
     }
   };
 
+  // Import a template from a JSON file (round-trips with the export button).
+  const handleImportJson = async (file: File) => {
+    if (!token) return;
+    setImportingJson(true);
+    setError('');
+    try {
+      const raw = JSON.parse(await file.text());
+      // Accept either a bare template object or an { template: {...} } wrapper.
+      const tpl = raw?.template ?? raw;
+      if (!tpl || typeof tpl.name !== 'string' || !tpl.name.trim()) {
+        throw new Error('Fichier JSON invalide : champ « name » manquant');
+      }
+      const created = await templatesApi.create(
+        {
+          name: tpl.name,
+          description: typeof tpl.description === 'string' ? tpl.description : undefined,
+          htmlContent: typeof tpl.htmlContent === 'string' ? tpl.htmlContent : undefined,
+          cssContent: typeof tpl.cssContent === 'string' ? tpl.cssContent : undefined,
+          variables: Array.isArray(tpl.variables) ? tpl.variables : undefined,
+        },
+        token,
+      );
+      await load();
+      router.push(`/dashboard/templates/${created.id}`);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Erreur lors de l'import JSON",
+      );
+    } finally {
+      setImportingJson(false);
+    }
+  };
+
+  // Export a template (full content) to a downloadable JSON file.
+  const handleExportJson = async (id: string, name: string) => {
+    if (!token) return;
+    try {
+      const tpl = await templatesApi.getOne(id, token);
+      const payload = {
+        format: 'htgether-template',
+        version: 1,
+        template: {
+          name: tpl.name,
+          description: tpl.description,
+          htmlContent: tpl.htmlContent,
+          cssContent: tpl.cssContent,
+          variables: tpl.variables,
+        },
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const base = (name || 'template')
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-|-$/g, '')
+        .toLowerCase();
+      a.href = url;
+      a.download = `${base || 'template'}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur lors de export');
+    }
+  };
+
   const filteredLibrary = categoryFilter
     ? library.filter((e) => e.category === categoryFilter)
     : library;
@@ -139,6 +212,29 @@ export default function TemplatesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImportJson(file);
+              e.target.value = '';
+            }}
+          />
+          <Button
+            variant="secondary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importingJson}
+          >
+            {importingJson ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Importer JSON
+          </Button>
           <Button variant="secondary" onClick={openLibrary}>
             <Library className="mr-1.5 h-3.5 w-3.5" />
             Bibliothèque
@@ -316,6 +412,15 @@ export default function TemplatesPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => { e.stopPropagation(); handleExportJson(t.id, t.name); }}
+                      title="Exporter en JSON"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

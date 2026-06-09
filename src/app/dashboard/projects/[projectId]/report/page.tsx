@@ -52,6 +52,7 @@ import {
   Link2,
   ArrowRight,
   Zap,
+  FileJson,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -1441,6 +1442,40 @@ export default function ProjectReportPage() {
     [persistReport],
   );
 
+  // ── Export the report as a self-contained JSON bundle ──
+  const exportJson = useCallback(() => {
+    const payload = {
+      format: 'htgether-report',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      project: project
+        ? {
+            name: project.name,
+            clientCompany: project.clientCompany,
+            auditType: project.auditType,
+          }
+        : null,
+      report: {
+        name: report?.name ?? 'Rapport',
+        content: { version: 3, sections, findingOrder } as ReportDataV3,
+      },
+      findings,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const base = (project?.name || 'rapport')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase();
+    a.href = url;
+    a.download = `${base || 'rapport'}-rapport.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [project, report, sections, findingOrder, findings]);
+
   // ── Save finding changes ──
 
   const persistFinding = useCallback(
@@ -1879,6 +1914,18 @@ export default function ProjectReportPage() {
                 </div>
               )}
             </div>
+
+            {/* Export JSON */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={exportJson}
+              title="Exporter le rapport au format JSON"
+            >
+              <FileJson className="h-3 w-3" />
+              Export JSON
+            </Button>
 
             {/* PDF actions */}
             <Button
