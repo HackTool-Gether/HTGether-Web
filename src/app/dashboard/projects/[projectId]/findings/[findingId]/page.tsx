@@ -16,13 +16,16 @@ import {
 import { ArrowLeft, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { CvssCalculator } from '@/components/findings/cvss-calculator';
+import { TagInput } from '@/components/findings/tag-input';
 
 const SEVERITIES: Severity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
 
+// Note: FALSE_POSITIVE is intentionally not selectable — a confirmed false
+// positive shouldn't be reported, so it has no place in the editor workflow.
 const STATUS_OPTIONS: { value: FindingStatus; label: string }[] = [
   { value: 'DRAFT', label: 'Brouillon' },
   { value: 'CONFIRMED', label: 'Confirmé' },
-  { value: 'FALSE_POSITIVE', label: 'Faux positif' },
   { value: 'FIXED', label: 'Corrigé' },
 ];
 
@@ -30,7 +33,7 @@ type Tab = 'description' | 'reproduction' | 'impact' | 'history';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'description', label: 'Description' },
-  { key: 'reproduction', label: 'Reproduction' },
+  { key: 'reproduction', label: 'PoC' },
   { key: 'impact', label: 'Impact & reco' },
   { key: 'history', label: 'Historique' },
 ];
@@ -150,6 +153,12 @@ export default function FindingEditPage() {
   const handleStatusChange = (s: FindingStatus) => {
     setStatus(s);
     persist({ status: s });
+  };
+  const handleCvssChange = ({ score, vector }: { score: number | null; vector: string }) => {
+    const scoreStr = score != null ? String(score) : '';
+    setCvssScore(scoreStr);
+    setCvssVector(vector);
+    persist({ cvssScore: score ?? undefined, cvssVector: vector || undefined });
   };
 
   const handleDelete = async () => {
@@ -308,7 +317,7 @@ export default function FindingEditPage() {
               <FindingEditor
                 value={proof}
                 onChange={setProof}
-                placeholder="Étapes de reproduction, requêtes, payloads…"
+                placeholder="Preuve de concept : étapes, requêtes, payloads…"
                 projectId={projectId}
               />
             )}
@@ -399,41 +408,19 @@ export default function FindingEditPage() {
 
           {/* CVSS */}
           <div className="cap" style={{ marginBottom: 8 }}>CVSS 3.1</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: 6, marginBottom: 8 }}>
-            <input
-              className="input"
-              type="number"
-              step="0.1"
-              min="0"
-              max="10"
-              value={cvssScore}
-              onChange={(e) => setCvssScore(e.target.value)}
-              placeholder="0.0"
-            />
-            <input
-              className="input mono"
-              value={cvssVector}
-              onChange={(e) => setCvssVector(e.target.value)}
-              placeholder="CVSS:3.1/AV:N/AC:L/…"
-              style={{ fontSize: 11 }}
-            />
-          </div>
-          <div className="mono" style={{ fontSize: 10.5, color: 'var(--fg-subtle)', marginBottom: 16 }}>
-            Calculateur interactif à venir.
-          </div>
+          <input
+            className="input mono"
+            value={cvssVector}
+            onChange={(e) => setCvssVector(e.target.value)}
+            placeholder="CVSS:3.1/AV:N/AC:L/…"
+            style={{ fontSize: 11, marginBottom: 8 }}
+          />
+          <CvssCalculator vector={cvssVector} onChange={handleCvssChange} />
+          <div style={{ marginBottom: 16 }} />
 
           {/* Tags */}
           <div className="cap" style={{ marginBottom: 8 }}>Tags</div>
-          <input
-            className="input"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="OWASP-A03, Injection, …"
-            style={{ marginBottom: 4 }}
-          />
-          <div className="mono" style={{ fontSize: 10.5, color: 'var(--fg-subtle)' }}>
-            Séparés par virgules.
-          </div>
+          <TagInput value={tags} onChange={setTags} />
         </aside>
       </div>
     </div>
