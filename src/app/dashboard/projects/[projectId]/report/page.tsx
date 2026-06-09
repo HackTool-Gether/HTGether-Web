@@ -20,7 +20,7 @@ import {
   type Severity,
   type FindingStatus,
 } from '@/lib/api';
-import { ReportProvider } from '@/lib/report-context';
+import { ReportProvider, useReport } from '@/lib/report-context';
 import {
   VariableNode,
   FindingsTableNode,
@@ -489,6 +489,7 @@ function SectionEditor({
   actions?: React.ReactNode;
   projectId?: string;
 }) {
+  const { canEdit } = useReport();
   return (
     <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
       <div
@@ -514,6 +515,7 @@ function SectionEditor({
       <input
         value={section.title}
         onChange={(e) => onTitleChange(e.target.value)}
+        readOnly={!canEdit}
         placeholder="Titre de la section"
         style={{
           width: '100%',
@@ -530,7 +532,7 @@ function SectionEditor({
         }}
       />
 
-      {actions}
+      {canEdit && actions}
 
       <div
         style={{
@@ -548,6 +550,7 @@ function SectionEditor({
           extraExtensions={extraExtensions}
           extraSlashItems={extraSlashItems}
           projectId={projectId}
+          editable={canEdit}
         />
       </div>
     </div>
@@ -1320,7 +1323,7 @@ export default function ProjectReportPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { setActiveProject } = useShell();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -1417,11 +1420,27 @@ export default function ProjectReportPage() {
     return () => setActiveProject(null);
   }, [project, findings.length, setActiveProject]);
 
+  // Report writing is gated by the `report.edit` permission. Managers are
+  // project leads (chefferie) and do not write the report by default; the
+  // client is read-only. Resolved from project overrides + role defaults.
+  const REPORT_EDIT_DEFAULTS: Record<string, boolean> = {
+    MANAGER: false,
+    PENTESTER: true,
+    CLIENT: false,
+  };
+  const myProjectRole = project?.members.find((m) => m.user.id === user?.id)?.role;
+  const canEditReport =
+    user?.role === 'SUPER_ADMIN' ||
+    (!!myProjectRole &&
+      (project?.rolePermissions?.[myProjectRole]?.['report.edit'] ??
+        REPORT_EDIT_DEFAULTS[myProjectRole] ??
+        false));
+
   // ── Save report sections ──
 
   const persistReport = useCallback(
     (sectionsToSave: ReportSection[], orderToSave: string[]) => {
-      if (!token || !report) return;
+      if (!token || !report || !canEditReport) return;
       const data: ReportDataV3 = { version: 3, sections: sectionsToSave, findingOrder: orderToSave };
       setSaveState('saving');
       const savePromise = report.id
@@ -1431,7 +1450,7 @@ export default function ProjectReportPage() {
         .then((r) => { setReport(r); setSaveState('saved'); })
         .catch(() => setSaveState('error'));
     },
-    [token, report, projectId],
+    [token, report, projectId, canEditReport],
   );
 
   const scheduleSaveReport = useCallback(
@@ -1775,7 +1794,7 @@ export default function ProjectReportPage() {
   }
 
   return (
-    <ReportProvider project={project} findings={findings}>
+    <ReportProvider project={project} findings={findings} canEdit={canEditReport}>
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 px-4 sm:px-8 pt-4 sm:pt-6 pb-3 border-b border-border">
@@ -1817,14 +1836,16 @@ export default function ProjectReportPage() {
                   )}
                 </div>
               ))}
-              <button
-                onClick={createReport}
-                disabled={creatingReport}
-                className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
-                title="Nouveau rapport"
-              >
-                {creatingReport ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-              </button>
+              {canEditReport && (
+                <button
+                  onClick={createReport}
+                  disabled={creatingReport}
+                  className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+                  title="Nouveau rapport"
+                >
+                  {creatingReport ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                </button>
+              )}
             </div>
           )}
 
@@ -1847,7 +1868,7 @@ export default function ProjectReportPage() {
               {sections.length} section{sections.length !== 1 ? 's' : ''} · {findings.length} finding{findings.length !== 1 ? 's' : ''}
             </span>
 
-            {reports.length <= 1 && (
+            {reports.length <= 1 && canEditReport && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -1958,6 +1979,12 @@ export default function ProjectReportPage() {
           </div>
         </div>
 
+        {!canEditReport && (
+          <div className="mx-4 sm:mx-8 mt-3 p-3 text-xs rounded-lg bg-muted text-muted-foreground">
+            Lecture seule — vous n’avez pas les droits de rédaction du rapport. Vous pouvez le consulter et l’exporter.
+          </div>
+        )}
+
         {error && (
           <div className="mx-4 sm:mx-8 mt-3 p-3 text-sm rounded-lg bg-destructive/10 text-destructive">
             {error}
@@ -1986,6 +2013,7 @@ export default function ProjectReportPage() {
               onAddSection={addSection}
               onDeleteSection={deleteSection}
               onReorderSections={reorderSections}
+              canEdit={canEditReport}
             />
           </div>
 

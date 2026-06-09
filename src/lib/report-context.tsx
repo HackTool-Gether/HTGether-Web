@@ -30,6 +30,8 @@ interface ReportContextValue {
   project: Project | null;
   findings: Finding[];
   resolveVariable: (path: string) => string;
+  // Whether the current user may edit the report content (report.edit permission).
+  canEdit: boolean;
 }
 
 const ReportContext = createContext<ReportContextValue | null>(null);
@@ -48,10 +50,12 @@ function severityCount(findings: Finding[], sev: string) {
 export function ReportProvider({
   project,
   findings,
+  canEdit = true,
   children,
 }: {
   project: Project | null;
   findings: Finding[];
+  canEdit?: boolean;
   children: ReactNode;
 }) {
   const value = useMemo<ReportContextValue>(() => {
@@ -90,8 +94,8 @@ export function ReportProvider({
           return `{{ ${path} }}`;
       }
     };
-    return { project, findings, resolveVariable };
-  }, [project, findings]);
+    return { project, findings, resolveVariable, canEdit };
+  }, [project, findings, canEdit]);
 
   return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }
@@ -103,6 +107,7 @@ export function useReport(): ReportContextValue {
       project: null,
       findings: [],
       resolveVariable: (path) => `{{ ${path} }}`,
+      canEdit: true,
     };
   }
   return ctx;

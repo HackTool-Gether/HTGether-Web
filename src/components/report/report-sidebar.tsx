@@ -64,6 +64,7 @@ interface ReportSidebarProps {
   onAddSection: (type?: string) => void;
   onDeleteSection: (id: string) => void;
   onReorderSections?: (fromIndex: number, toIndex: number) => void;
+  canEdit?: boolean;
 }
 
 // ── Constants ───────────────────────────────────────────────────────────
@@ -104,12 +105,14 @@ function SortableSectionItem({
   onSelect,
   onDelete,
   badge,
+  canEdit = true,
 }: {
   sec: SidebarSection;
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
   badge?: number;
+  canEdit?: boolean;
 }) {
   const {
     attributes,
@@ -121,7 +124,7 @@ function SortableSectionItem({
   } = useSortable({ id: sec.id });
 
   const Icon = SECTION_ICON[sec.type] || FileText;
-  const isDeletable = !sec.predefined;
+  const isDeletable = !sec.predefined && canEdit;
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -235,6 +238,7 @@ export function ReportSidebar({
   onAddSection,
   onDeleteSection,
   onReorderSections,
+  canEdit = true,
 }: ReportSidebarProps) {
   const [search, setSearch] = useState('');
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -345,6 +349,7 @@ export function ReportSidebar({
                     onSelect={() => onSelectSection(sec.id)}
                     onDelete={() => onDeleteSection(sec.id)}
                     badge={sec.type === 'findings' ? findings.length : undefined}
+                    canEdit={canEdit}
                   />
 
                   {/* Findings sub-list (shown when findings section or a finding is active) */}
@@ -517,6 +522,8 @@ export function ReportSidebar({
           </SortableContext>
         </DndContext>
 
+        {canEdit && (
+        <>
         {/* Separator */}
         <div style={{ height: 1, background: 'var(--border-subtle)', margin: '8px 4px' }} />
 
@@ -638,6 +645,8 @@ export function ReportSidebar({
             <Link2 size={12} />
             Ajouter les chaînes d&apos;attaque
           </button>
+        )}
+        </>
         )}
       </div>
     </div>
