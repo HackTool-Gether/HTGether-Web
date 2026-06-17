@@ -88,12 +88,6 @@ export default function DashboardPage() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  const today = new Date().toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-
   const isEmpty = !loading && projects && projects.length === 0;
 
   return (
@@ -103,7 +97,7 @@ export default function DashboardPage() {
       ) : (
         <DashboardActive
           firstName={user?.firstName}
-          today={today}
+
           projects={projects || []}
           stats={stats}
           loading={loading}
@@ -215,7 +209,6 @@ function DashboardEmpty({ firstName }: { firstName?: string }) {
 
 interface DashboardActiveProps {
   firstName?: string;
-  today: string;
   projects: Project[];
   stats: DashboardStats | null;
   loading: boolean;
@@ -227,7 +220,6 @@ interface DashboardActiveProps {
 
 function DashboardActive({
   firstName,
-  today,
   projects,
   stats,
   loading,
@@ -244,10 +236,7 @@ function DashboardActive({
       {/* Header */}
       <div className="flex items-end justify-between gap-4 mb-6">
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
-            {today}
-          </p>
-          <h1 className="text-2xl font-bold mt-1">
+          <h1 className="text-2xl font-bold">
             Bonjour {firstName || ''}.
           </h1>
         </div>

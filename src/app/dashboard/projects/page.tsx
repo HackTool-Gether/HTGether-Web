@@ -411,7 +411,7 @@ export default function ProjectsPage() {
 
                     {/* Due date */}
                     <div
-                      className={`font-mono text-[11px] text-right ${
+                      className={`text-[11px] text-right ${
                         due.overdue ? 'text-destructive font-medium' : 'text-muted-foreground'
                       }`}
                     >

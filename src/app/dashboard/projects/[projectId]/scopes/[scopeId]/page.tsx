@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { scopesApi, notesApi, componentsApi, ApiError } from '@/lib/api';
-import type { ScopeDetail, Note, ComponentData, ComponentStatus } from '@/lib/api';
+import type { ScopeDetail, ScopeStatus, Note, ComponentData, ComponentStatus } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -31,6 +31,15 @@ const STATUS_META: Record<ComponentStatus, { label: string; color: string; bg: s
 
 const STATUS_ORDER: ComponentStatus[] = ['VULNERABLE', 'REMARK', 'COMPLIANT', 'UNTESTED'];
 
+const SCOPE_STATUS_META: Record<ScopeStatus, { label: string; color: string; bg: string }> = {
+  NOT_STARTED: { label: 'À démarrer', color: 'oklch(0.62 0.01 250)', bg: 'oklch(0.62 0.01 250 / 0.12)' },
+  IN_PROGRESS: { label: 'En cours', color: 'oklch(0.65 0.18 260)', bg: 'oklch(0.65 0.18 260 / 0.12)' },
+  IN_REVIEW: { label: 'En revue', color: 'oklch(0.75 0.15 75)', bg: 'oklch(0.75 0.15 75 / 0.12)' },
+  COMPLETED: { label: 'Terminé', color: 'oklch(0.72 0.17 150)', bg: 'oklch(0.72 0.17 150 / 0.12)' },
+};
+
+const SCOPE_STATUS_ORDER: ScopeStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED'];
+
 export default function ScopeDetailPage() {
   const { token } = useAuth();
   const router = useRouter();
@@ -50,6 +59,8 @@ export default function ScopeDetailPage() {
   const [compForm, setCompForm] = useState({ name: '', type: '' });
   const [creatingComp, setCreatingComp] = useState(false);
   const [statusMenu, setStatusMenu] = useState<string | null>(null);
+  const [scopeStatusMenu, setScopeStatusMenu] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -126,6 +137,20 @@ export default function ScopeDetailPage() {
     }
   };
 
+  const handleScopeStatusChange = async (status: ScopeStatus) => {
+    if (!token || !scope) return;
+    setScopeStatusMenu(false);
+    setUpdatingStatus(true);
+    try {
+      const updated = await scopesApi.update(projectId, scopeId, { status }, token);
+      setScope({ ...scope, status: updated.status });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const handleDeleteComponent = async (compId: string) => {
     if (!token) return;
     try {
@@ -173,7 +198,45 @@ export default function ScopeDetailPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             {scope.project.name}
           </Button>
-          <h1 className="text-2xl font-bold">{scope.name}</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">{scope.name}</h1>
+            <div className="relative">
+              <button
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
+                style={{
+                  background: SCOPE_STATUS_META[scope.status].bg,
+                  color: SCOPE_STATUS_META[scope.status].color,
+                }}
+                onClick={() => setScopeStatusMenu(!scopeStatusMenu)}
+                disabled={updatingStatus}
+              >
+                {updatingStatus ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: SCOPE_STATUS_META[scope.status].color }} />
+                )}
+                {SCOPE_STATUS_META[scope.status].label}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {scopeStatusMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setScopeStatusMenu(false)} />
+                  <div className="absolute top-full left-0 mt-1 z-20 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[140px]">
+                    {SCOPE_STATUS_ORDER.map((s) => (
+                      <button
+                        key={s}
+                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-muted/50 transition-colors"
+                        onClick={() => handleScopeStatusChange(s)}
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ background: SCOPE_STATUS_META[s].color }} />
+                        {SCOPE_STATUS_META[s].label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
           {scope.description && (
             <p className="text-sm text-muted-foreground mt-1">{scope.description}</p>
           )}

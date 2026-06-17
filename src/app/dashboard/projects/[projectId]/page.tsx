@@ -421,7 +421,7 @@ export default function ProjectDetailPage() {
           <>
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono mb-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
                   {project.clientCompany} · {AUDIT_LABELS[project.auditType]}
                 </p>
                 <div className="flex items-center gap-2">
@@ -434,7 +434,7 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  <span className="font-mono">
+                  <span>
                     {new Date(project.startDate).toLocaleDateString('fr-FR')} — {new Date(project.endDate).toLocaleDateString('fr-FR')}
                   </span>
                   <span className="capitalize">{STATUS_PHASE[project.status]}</span>
@@ -458,7 +458,7 @@ export default function ProjectDetailPage() {
                   }}
                 />
               </div>
-              <div className="flex justify-between mt-1 text-[10.5px] text-muted-foreground font-mono">
+              <div className="flex justify-between mt-1 text-[10.5px] text-muted-foreground">
                 <span>jour {Math.round((progress / 100) * Math.max(1, durationDays(project)))} / {durationDays(project)}</span>
                 <span>{progress}%</span>
               </div>
@@ -540,6 +540,15 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
           {/* Left column */}
           <div className="flex flex-col gap-4">
+            {/* Cadrage */}
+            <div className="rounded-xl bg-card p-4">
+              <div className="cap mb-2.5">Cadrage</div>
+              <div className="grid grid-cols-2 gap-4">
+                <Block label="Besoin client" value={project.clientNeed} />
+                <Block label="Contexte" value={project.context} />
+              </div>
+            </div>
+
             {/* Findings by severity */}
             {stats && stats.findings.total > 0 && (
               <div className="rounded-xl bg-card p-4">
@@ -607,15 +616,6 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
-            {/* Cadrage */}
-            <div className="rounded-xl bg-card p-4">
-              <div className="cap mb-2.5">Cadrage</div>
-              <div className="grid grid-cols-2 gap-4">
-                <Block label="Besoin client" value={project.clientNeed} />
-                <Block label="Contexte" value={project.context} />
-              </div>
-            </div>
-
             {/* Scopes */}
             <div className="rounded-xl bg-card overflow-hidden">
               <div className="flex items-center px-4 py-3">
@@ -673,7 +673,7 @@ export default function ProjectDetailPage() {
                       style={{ gridTemplateColumns: '1fr auto auto auto' }}
                     >
                       <div className="min-w-0">
-                        <div className="font-mono text-sm font-medium flex items-center gap-1.5">
+                        <div className="text-sm font-medium flex items-center gap-1.5">
                           {scope.name}
                           {isStalled && (
                             <span className="text-[9px] px-1 py-0.5 rounded font-sans"
