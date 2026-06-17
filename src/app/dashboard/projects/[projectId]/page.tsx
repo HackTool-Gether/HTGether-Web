@@ -461,7 +461,7 @@ export default function ProjectDetailPage() {
                 />
               </div>
               <div className="flex justify-between mt-1 text-[10.5px] text-muted-foreground">
-                <span>jour {Math.round((progress / 100) * Math.max(1, durationDays(project)))} / {durationDays(project)}</span>
+                <span>Jour {Math.round((progress / 100) * Math.max(1, durationDays(project)))} / {durationDays(project)}</span>
                 <span>{progress}%</span>
               </div>
             </div>
