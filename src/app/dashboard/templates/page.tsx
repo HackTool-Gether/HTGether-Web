@@ -320,7 +320,6 @@ export default function TemplatesPage() {
                         <div
                           key={entry.slug}
                           className="rounded-xl border border-border p-4 flex flex-col gap-3 transition-all cursor-pointer hover:bg-muted/50"
-                          style={{}}
                           onClick={() => !importing && handleImport(entry.slug)}
                         >
                           <div className="flex items-start gap-3">

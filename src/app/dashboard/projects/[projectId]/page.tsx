@@ -421,30 +421,32 @@ export default function ProjectDetailPage() {
           <>
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-                  {project.clientCompany} · {AUDIT_LABELS[project.auditType]}
-                </p>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold">{project.name}</h1>
+                <h1 className="text-2xl font-bold">{project.name}</h1>
+                <div className="flex items-center gap-2 mt-1.5 text-sm text-muted-foreground">
+                  <span>{project.clientCompany}</span>
+                  <span className="text-border">—</span>
+                  <span>{AUDIT_LABELS[project.auditType]}</span>
+                  <span className="text-border">—</span>
+                  <span>
+                    {new Date(project.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                    {' → '}
+                    {new Date(project.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
                   {stats?.alerts.isLate && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                      style={{ background: 'oklch(0.65 0.2 25 / 0.15)', color: 'oklch(0.65 0.2 25)' }}>
-                      <AlertTriangle size={10} /> EN RETARD
+                    <span className="text-xs text-destructive flex items-center gap-1">
+                      <AlertTriangle size={11} /> en retard
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  <span>
-                    {new Date(project.startDate).toLocaleDateString('fr-FR')} — {new Date(project.endDate).toLocaleDateString('fr-FR')}
-                  </span>
-                  <span className="capitalize">{STATUS_PHASE[project.status]}</span>
-                </div>
               </div>
-              {isManager && (
-                <Button variant="outline" size="sm" onClick={startEditing}>
-                  <Pencil className="mr-1 h-3 w-3" /> Éditer
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground capitalize">{STATUS_PHASE[project.status]}</span>
+                {isManager && (
+                  <Button variant="outline" size="sm" onClick={startEditing}>
+                    <Pencil className="mr-1 h-3 w-3" /> Éditer
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Progress */}
@@ -502,47 +504,13 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* Stats cards */}
-        {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <StatCard
-              label="Périmètres"
-              value={`${stats.scopes.completed}/${stats.scopes.total}`}
-              sub={`${stats.scopes.completionPercent}% terminés`}
-              icon={<Target size={14} />}
-              color="oklch(0.60 0.15 145)"
-            />
-            <StatCard
-              label="Findings"
-              value={String(stats.findings.total)}
-              sub={`${stats.findings.bySeverity.CRITICAL || 0} critiques`}
-              icon={<Bug size={14} />}
-              color="oklch(0.65 0.2 25)"
-            />
-            <StatCard
-              label="Tâches"
-              value={`${stats.tasks.byStatus.DONE || 0}/${stats.tasks.total}`}
-              sub={`${stats.tasks.completionPercent}% terminées`}
-              icon={<ListChecks size={14} />}
-              color="oklch(0.65 0.15 250)"
-            />
-            <StatCard
-              label="Timeline"
-              value={`J${stats.timeline.daysElapsed}`}
-              sub={`/ ${stats.timeline.daysTotal} jours`}
-              icon={<Clock size={14} />}
-              color={stats.alerts.isLate ? 'oklch(0.65 0.2 25)' : 'oklch(0.6 0.12 60)'}
-            />
-          </div>
-        )}
-
         {/* Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
           {/* Left column */}
           <div className="flex flex-col gap-4">
             {/* Cadrage */}
             <div className="rounded-xl bg-card p-4">
-              <div className="cap mb-2.5">Cadrage</div>
+              <div className="text-sm font-medium mb-2.5">Cadrage</div>
               <div className="grid grid-cols-2 gap-4">
                 <Block label="Besoin client" value={project.clientNeed} />
                 <Block label="Contexte" value={project.context} />
@@ -552,7 +520,7 @@ export default function ProjectDetailPage() {
             {/* Findings by severity */}
             {stats && stats.findings.total > 0 && (
               <div className="rounded-xl bg-card p-4">
-                <div className="cap mb-3">Findings par sévérité</div>
+                <div className="text-sm font-medium mb-3">Findings par sévérité</div>
                 <div className="flex gap-1.5 h-3 rounded-full overflow-hidden mb-2">
                   {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].map((sev) => {
                     const count = stats.findings.bySeverity[sev] || 0;
@@ -579,7 +547,7 @@ export default function ProjectDetailPage() {
 
                 {stats.findings.byAuthor.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-border">
-                    <div className="text-[10.5px] text-muted-foreground uppercase tracking-wider mb-1.5">Par auditeur</div>
+                    <div className="text-xs text-muted-foreground mb-1.5">Par auditeur</div>
                     <div className="space-y-1">
                       {stats.findings.byAuthor.map((a) => (
                         <div key={a.userId} className="flex items-center justify-between text-xs">
@@ -596,7 +564,7 @@ export default function ProjectDetailPage() {
             {/* Task progress by member */}
             {stats && stats.tasks.byMember.length > 0 && (
               <div className="rounded-xl bg-card p-4">
-                <div className="cap mb-3">Tâches par membre</div>
+                <div className="text-sm font-medium mb-3">Tâches par membre</div>
                 <div className="space-y-2.5">
                   {stats.tasks.byMember.map((m) => {
                     const pct = m.total ? Math.round((m.done / m.total) * 100) : 0;
@@ -717,7 +685,7 @@ export default function ProjectDetailPage() {
           <div className="flex flex-col gap-4">
             {/* Team */}
             <div className="rounded-xl bg-card p-4">
-              <div className="cap mb-2.5">Équipe ({project.members?.length || 0})</div>
+              <div className="text-sm font-medium mb-2.5">Équipe ({project.members?.length || 0})</div>
               {(!project.members || project.members.length === 0) ? (
                 <div className="text-xs text-muted-foreground">Aucun membre.</div>
               ) : (
@@ -745,7 +713,7 @@ export default function ProjectDetailPage() {
             {/* Scope completion */}
             {stats && stats.scopes.total > 0 && (
               <div className="rounded-xl bg-card p-4">
-                <div className="cap mb-2.5">Avancement périmètres</div>
+                <div className="text-sm font-medium mb-2.5">Avancement périmètres</div>
                 <div className="flex gap-1 h-2 rounded-full overflow-hidden mb-2">
                   {[
                     { key: 'completed', color: 'oklch(0.60 0.15 145)', count: stats.scopes.completed },
@@ -774,8 +742,8 @@ export default function ProjectDetailPage() {
             {/* AI config */}
             {isManager && project && (
               <div className="rounded-xl bg-card p-4">
-                <div className="cap mb-2.5 flex items-center gap-1.5">
-                  <Brain size={11} />
+                <div className="text-sm font-medium mb-2.5 flex items-center gap-1.5">
+                  <Brain size={13} />
                   Intelligence Artificielle
                 </div>
                 <div className="flex items-center justify-between mb-3">
@@ -835,8 +803,8 @@ export default function ProjectDetailPage() {
             {/* Manager remarks */}
             {isManager && (
               <div className="rounded-xl bg-card p-4">
-                <div className="cap mb-2.5 flex items-center gap-1.5">
-                  <MessageSquare size={11} />
+                <div className="text-sm font-medium mb-2.5 flex items-center gap-1.5">
+                  <MessageSquare size={13} />
                   Remarques manager
                 </div>
                 <form onSubmit={handleSendRemark} className="flex gap-2 mb-3">
@@ -897,29 +865,10 @@ function durationDays(p: ProjectDetail): number {
 function Block({ label, value }: { label: string; value?: string }) {
   return (
     <div>
-      <div className="cap text-[10.5px] mb-1">{label}</div>
+      <div className="text-xs text-muted-foreground mb-1">{label}</div>
       <div className="text-sm leading-relaxed">
         {value || <span className="text-muted-foreground">—</span>}
       </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value, sub, icon, color }: {
-  label: string; value: string; sub: string;
-  icon: React.ReactNode; color: string;
-}) {
-  return (
-    <div className="rounded-xl bg-card border border-border p-3">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <div className="w-6 h-6 rounded-md flex items-center justify-center"
-          style={{ background: `color-mix(in oklch, ${color} 15%, transparent)`, color }}>
-          {icon}
-        </div>
-        <span className="text-[10.5px] text-muted-foreground uppercase tracking-wider">{label}</span>
-      </div>
-      <div className="text-lg font-bold font-mono leading-none">{value}</div>
-      <div className="text-[10.5px] text-muted-foreground font-mono mt-0.5">{sub}</div>
     </div>
   );
 }
