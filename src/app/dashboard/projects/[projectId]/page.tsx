@@ -32,7 +32,6 @@ import {
   AlertTriangle,
   Clock,
   Bug,
-  ListChecks,
   Send,
   MessageSquare,
   Brain,
