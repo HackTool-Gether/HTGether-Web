@@ -769,6 +769,30 @@ async function insertImageFile(editor: any, file: File) {
   editor.chain().focus().setImage({ src }).run();
 }
 
+function compressImageForAi(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxDim = 768;
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        const scale = maxDim / Math.max(w, h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 function extractSelectionContent(editor: any): { text: string; images: string[] } {
   const { from, to } = editor.state.selection;
   const text = editor.state.doc.textBetween(from, to, '\n');
@@ -1008,7 +1032,7 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
 
     useImperativeHandle(ref, () => editor, [editor]);
 
-    const handleAiTrigger = useCallback((action: string, promptOverride?: string) => {
+    const handleAiTrigger = useCallback(async (action: string, promptOverride?: string) => {
       if (!editor || aiGenerating) return;
 
       let content: string;
@@ -1025,9 +1049,13 @@ export const RichTextEditor = forwardRef<any, RichTextEditorProps>(
         editor.chain().focus().deleteRange({ from, to }).run();
       }
 
+      const compressedImages = images.length > 0
+        ? await Promise.all(images.map(compressImageForAi))
+        : undefined;
+
       aiGenerate({
         content,
-        images: images.length > 0 ? images : undefined,
+        images: compressedImages,
         projectId,
         action: action as 'reformulate' | 'generate' | 'complete',
         onChunk: (chunk) => {
