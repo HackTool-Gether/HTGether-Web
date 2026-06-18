@@ -624,21 +624,7 @@ export default function LoginPage() {
             gap: 16,
           }}
         >
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 'var(--r-xl)',
-              background: 'rgba(94, 106, 210, 0.10)',
-              border: '1px solid rgba(94, 106, 210, 0.20)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <HtgLogo size={32} style={{ opacity: 0.6 }} />
-          </div>
+          <HtgLogo size={80} variant="white" style={{ opacity: 0.85 }} />
           <div style={{ textAlign: 'center' }}>
             <div
               style={{

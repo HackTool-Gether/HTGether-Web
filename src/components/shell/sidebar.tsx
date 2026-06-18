@@ -400,22 +400,9 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
     >
       {/* Logo */}
       <div style={{ padding: '14px 14px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: 'var(--r-md)',
-            background:
-              'linear-gradient(135deg, var(--accent), oklch(from var(--accent) calc(l - 0.15) c h))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <HtgLogo size={18} />
-        </div>
+        <HtgLogo size={34} />
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>HTGether</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>HackToolGether</span>
           <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-subtle)' }}>
             {user?.email?.split('@')[1] || 'workspace'}
           </span>

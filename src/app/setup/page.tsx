@@ -337,19 +337,7 @@ export default function SetupPage() {
       >
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', marginBottom: 8 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 'var(--r-lg)',
-              background: 'var(--accent)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <HtgLogo size={16} />
-          </div>
+          <HtgLogo size={36} />
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.02em' }}>HTGether</div>
             <div style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>Configuration initiale</div>

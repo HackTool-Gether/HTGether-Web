@@ -237,6 +237,13 @@ button { font-family: inherit; }
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
+/* Logo theme auto-switch: dark is default, light is the override */
+.htg-logo-dark { display: none; }
+[data-theme="light"] .htg-logo-dark,
+.light .htg-logo-dark { display: unset; }
+[data-theme="light"] .htg-logo-white,
+.light .htg-logo-white { display: none; }
+
 .mono { font-family: var(--font-mono); font-feature-settings: "ss02"; }
 .cap {
   font-size: var(--text-caption-size);
