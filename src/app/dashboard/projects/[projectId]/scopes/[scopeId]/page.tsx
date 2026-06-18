@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { ClientGuard } from '@/components/client-guard';
 import { scopesApi, notesApi, componentsApi, ApiError } from '@/lib/api';
 import type { ScopeDetail, ScopeStatus, Note, ComponentData, ComponentStatus } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,10 @@ const SCOPE_STATUS_META: Record<ScopeStatus, { label: string; color: string; bg:
 const SCOPE_STATUS_ORDER: ScopeStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED'];
 
 export default function ScopeDetailPage() {
+  return <ClientGuard><ScopeDetailPageInner /></ClientGuard>;
+}
+
+function ScopeDetailPageInner() {
   const { token } = useAuth();
   const router = useRouter();
   const params = useParams();

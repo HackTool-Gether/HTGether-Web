@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Avatar } from '@/components/shell/avatar';
 import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
+import { ClientGuard } from '@/components/client-guard';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -32,6 +33,10 @@ const ROLE_LABELS: Record<ProjectRole, string> = {
 };
 
 export default function MembersPage() {
+  return <ClientGuard><MembersPageInner /></ClientGuard>;
+}
+
+function MembersPageInner() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { ClientGuard } from '@/components/client-guard';
 import { useShell } from '@/components/shell/shell-context';
 import {
   projectsApi,
@@ -43,6 +44,10 @@ const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
 ];
 
 export default function TasksPage() {
+  return <ClientGuard><TasksPageInner /></ClientGuard>;
+}
+
+function TasksPageInner() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;

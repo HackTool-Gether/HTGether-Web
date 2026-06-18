@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { ClientGuard } from '@/components/client-guard';
 import {
   workloadApi, ApiError,
   type WorkloadData, type WorkloadMember, type WorkloadScope, type ScopeStatus,
@@ -32,6 +33,10 @@ function workloadLevel(total: number): { label: string; color: string } {
 }
 
 export default function WorkloadPage() {
+  return <ClientGuard><WorkloadPageInner /></ClientGuard>;
+}
+
+function WorkloadPageInner() {
   const { token, user } = useAuth();
   const params = useParams();
   const projectId = params.projectId as string;

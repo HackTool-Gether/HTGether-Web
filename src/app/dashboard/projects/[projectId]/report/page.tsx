@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
+import { ClientGuard } from '@/components/client-guard';
 import {
   reportsApi,
   projectsApi,
@@ -1320,6 +1321,10 @@ function EmptyState({ onGenerate, findingsCount }: { onGenerate: () => void; fin
 // ── Main page ───────────────────────────────────────────────────────────
 
 export default function ProjectReportPage() {
+  return <ClientGuard><ProjectReportPageInner /></ClientGuard>;
+}
+
+function ProjectReportPageInner() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;

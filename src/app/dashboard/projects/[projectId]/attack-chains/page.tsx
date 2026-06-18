@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { ClientGuard } from '@/components/client-guard';
 import {
   attackChainsApi, findingsApi, ApiError,
   type AttackChain, type Finding,
@@ -23,6 +24,10 @@ const SEV_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 export default function AttackChainsPage() {
+  return <ClientGuard><AttackChainsPageInner /></ClientGuard>;
+}
+
+function AttackChainsPageInner() {
   const { token } = useAuth();
   const params = useParams();
   const projectId = params.projectId as string;

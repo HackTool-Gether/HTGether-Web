@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { ClientGuard } from '@/components/client-guard';
 import { notesApi, ApiError } from '@/lib/api';
 import type { NoteDetail } from '@/lib/api';
 import dynamic from 'next/dynamic';
@@ -30,6 +31,10 @@ const RichTextEditor = dynamic(
 );
 
 export default function NoteEditorPage() {
+  return <ClientGuard><NoteEditorPageInner /></ClientGuard>;
+}
+
+function NoteEditorPageInner() {
   const { token } = useAuth();
   const router = useRouter();
   const params = useParams();

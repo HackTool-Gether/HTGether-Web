@@ -144,10 +144,13 @@ export default function ProjectDetailPage() {
   const [remarkText, setRemarkText] = useState('');
   const [sendingRemark, setSendingRemark] = useState(false);
 
+  const myProjectRole = user && project
+    ? project.members?.find((m) => m.user.id === user.id)?.role
+    : undefined;
   const isManager = user && project && (
-    user.role === 'SUPER_ADMIN' ||
-    project.members?.some((m) => m.user.id === user.id && m.role === 'MANAGER')
+    user.role === 'SUPER_ADMIN' || myProjectRole === 'MANAGER'
   );
+  const isClient = myProjectRole === 'CLIENT' && user?.role !== 'SUPER_ADMIN';
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -592,9 +595,11 @@ export default function ProjectDetailPage() {
                     {project.scopes?.length || 0}
                   </span>
                 </span>
-                <Button size="sm" variant="outline" className="ml-auto" onClick={() => setShowAddScope(true)}>
-                  <Plus className="mr-1 h-3 w-3" /> Nouveau
-                </Button>
+                {!isClient && (
+                  <Button size="sm" variant="outline" className="ml-auto" onClick={() => setShowAddScope(true)}>
+                    <Plus className="mr-1 h-3 w-3" /> Nouveau
+                  </Button>
+                )}
               </div>
 
               {showAddScope && (
@@ -627,7 +632,7 @@ export default function ProjectDetailPage() {
               {(!project.scopes || project.scopes.length === 0) ? (
                 <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                   <Target className="h-5 w-5 mx-auto mb-2 text-muted-foreground/50" />
-                  Aucun périmètre. Ajoutez-en pour démarrer le test.
+                  {isClient ? 'Aucun périmètre défini.' : 'Aucun périmètre. Ajoutez-en pour démarrer le test.'}
                 </div>
               ) : (
                 project.scopes.map((scope: Scope) => {
@@ -635,9 +640,9 @@ export default function ProjectDetailPage() {
                   return (
                     <div
                       key={scope.id}
-                      onClick={() => router.push(`/dashboard/projects/${projectId}/scopes/${scope.id}`)}
-                      className="grid gap-3.5 items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                      style={{ gridTemplateColumns: '1fr auto auto auto' }}
+                      onClick={isClient ? undefined : () => router.push(`/dashboard/projects/${projectId}/scopes/${scope.id}`)}
+                      className={`grid gap-3.5 items-center px-4 py-3 transition-colors ${isClient ? '' : 'cursor-pointer hover:bg-muted/50'}`}
+                      style={{ gridTemplateColumns: isClient ? '1fr auto auto' : '1fr auto auto auto' }}
                     >
                       <div className="min-w-0">
                         <div className="text-sm font-medium flex items-center gap-1.5">
@@ -662,17 +667,19 @@ export default function ProjectDetailPage() {
                       <span className={`badge badge-${SCOPE_BADGE[scope.status]}`}>
                         {SCOPE_LABEL[scope.status]}
                       </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteScope(scope.id);
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {!isClient && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteScope(scope.id);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   );
                 })

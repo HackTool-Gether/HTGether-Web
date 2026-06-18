@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { authApi, ApiError } from '@/lib/api';
@@ -27,25 +27,21 @@ export default function ChangePasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Wait for auth to load
-  if (isLoading) {
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user || !token) {
+      router.replace('/login');
+    } else if (!user.mustChangePassword) {
+      router.replace('/dashboard');
+    }
+  }, [isLoading, user, token, router]);
+
+  if (isLoading || !user || !token || !user.mustChangePassword) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
-  }
-
-  // Not logged in → login page
-  if (!user || !token) {
-    router.replace('/login');
-    return null;
-  }
-
-  // Doesn't need to change password → dashboard
-  if (!user.mustChangePassword) {
-    router.replace('/dashboard');
-    return null;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useShell } from '@/components/shell/shell-context';
 import { useAuth } from '@/lib/auth-context';
+import { ClientGuard } from '@/components/client-guard';
 import {
   findingsApi,
   projectsApi,
@@ -39,6 +40,10 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export default function FindingEditPage() {
+  return <ClientGuard><FindingEditPageInner /></ClientGuard>;
+}
+
+function FindingEditPageInner() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;

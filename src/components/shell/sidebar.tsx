@@ -139,15 +139,50 @@ function ProjectNavItem({ label, href, active }: ProjectNavItemProps) {
   );
 }
 
+function ProjectSubNav({ base, pathname, scopes, isClient }: {
+  base: string;
+  pathname: string;
+  scopes: Scope[];
+  isClient: boolean;
+}) {
+  return (
+    <div style={{ padding: '4px 0 2px' }}>
+      <ProjectNavItem label="Vue d'ensemble" href={base} active={pathname === base} />
+      {!isClient && (
+        <>
+          <ProjectNavItem label="Membres" href={`${base}/members`} active={pathname.startsWith(`${base}/members`)} />
+          <ProjectNavItem label="Attribution" href={`${base}/workload`} active={pathname.startsWith(`${base}/workload`)} />
+          <ProjectNavItem label="Tâches" href={`${base}/tasks`} active={pathname.startsWith(`${base}/tasks`)} />
+          <ProjectNavItem label="Findings" href={`${base}/findings`} active={pathname.startsWith(`${base}/findings`)} />
+          <ProjectNavItem label="Chaînes d'attaque" href={`${base}/attack-chains`} active={pathname.startsWith(`${base}/attack-chains`)} />
+          <ProjectNavItem label="Rapport" href={`${base}/report`} active={pathname.startsWith(`${base}/report`)} />
+        </>
+      )}
+      <ProjectNavItem label="Messages" href={`${base}/messages`} active={pathname.startsWith(`${base}/messages`)} />
+      {!isClient && scopes.length > 0 && (
+        <>
+          <div className="cap" style={{ padding: '8px 10px 4px 38px', fontSize: 10, color: 'var(--fg-subtle)' }}>
+            Périmètres
+          </div>
+          {scopes.map((s) => (
+            <ProjectNavItem key={s.id} label={s.name} href={`${base}/scopes/${s.id}`} active={pathname.startsWith(`${base}/scopes/${s.id}`)} />
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 interface ProjectTreeItemProps {
   project: Project;
   expanded: boolean;
   onToggle: () => void;
   pathname: string;
   token: string | null;
+  userId?: string;
 }
 
-function ProjectTreeItem({ project, expanded, onToggle, pathname, token }: ProjectTreeItemProps) {
+function ProjectTreeItem({ project, expanded, onToggle, pathname, token, userId }: ProjectTreeItemProps) {
   const router = useRouter();
   const base = `/dashboard/projects/${project.id}`;
   const isInThisProject = pathname.startsWith(base);
@@ -264,66 +299,12 @@ function ProjectTreeItem({ project, expanded, onToggle, pathname, token }: Proje
 
       {/* Sub-navigation */}
       {expanded && (
-        <div style={{ padding: '4px 0 2px' }}>
-          <ProjectNavItem
-            label="Vue d'ensemble"
-            href={base}
-            active={pathname === base}
-          />
-          <ProjectNavItem
-            label="Membres"
-            href={`${base}/members`}
-            active={pathname.startsWith(`${base}/members`)}
-          />
-          <ProjectNavItem
-            label="Attribution"
-            href={`${base}/workload`}
-            active={pathname.startsWith(`${base}/workload`)}
-          />
-          <ProjectNavItem
-            label="Tâches"
-            href={`${base}/tasks`}
-            active={pathname.startsWith(`${base}/tasks`)}
-          />
-          <ProjectNavItem
-            label="Findings"
-            href={`${base}/findings`}
-            active={pathname.startsWith(`${base}/findings`)}
-          />
-          <ProjectNavItem
-            label="Chaînes d'attaque"
-            href={`${base}/attack-chains`}
-            active={pathname.startsWith(`${base}/attack-chains`)}
-          />
-          <ProjectNavItem
-            label="Rapport"
-            href={`${base}/report`}
-            active={pathname.startsWith(`${base}/report`)}
-          />
-          <ProjectNavItem
-            label="Messages"
-            href={`${base}/messages`}
-            active={pathname.startsWith(`${base}/messages`)}
-          />
-          {scopes.length > 0 && (
-            <>
-              <div
-                className="cap"
-                style={{ padding: '8px 10px 4px 38px', fontSize: 10, color: 'var(--fg-subtle)' }}
-              >
-                Périmètres
-              </div>
-              {scopes.map((s) => (
-                <ProjectNavItem
-                  key={s.id}
-                  label={s.name}
-                  href={`${base}/scopes/${s.id}`}
-                  active={pathname.startsWith(`${base}/scopes/${s.id}`)}
-                />
-              ))}
-            </>
-          )}
-        </div>
+        <ProjectSubNav
+          base={base}
+          pathname={pathname}
+          scopes={scopes}
+          isClient={project.members?.find((m) => m.user.id === userId)?.role === 'CLIENT'}
+        />
       )}
     </div>
   );
@@ -480,6 +461,7 @@ export function Sidebar({ onOpenPalette }: SidebarProps) {
                 onToggle={() => toggleProject(p.id)}
                 pathname={pathname}
                 token={token}
+                userId={user?.id}
               />
             ))}
           </>
