@@ -121,6 +121,7 @@ export default function SettingsPage() {
   // Allowed domains state
   const [allowedDomains, setAllowedDomains] = useState<AllowedDomain[]>([]);
   const [newDomain, setNewDomain] = useState('');
+  const [domainError, setDomainError] = useState('');
 
   // Copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -402,6 +403,7 @@ export default function SettingsPage() {
 
   const addDomain = async () => {
     if (!newDomain.trim() || !token) return;
+    setDomainError('');
     try {
       await settingsApi.addAllowedDomain(newDomain.trim(), token);
       setNewDomain('');
@@ -409,7 +411,7 @@ export default function SettingsPage() {
       setAllowedDomains(domains);
       showSuccess('Domaine ajouté');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Erreur');
+      setDomainError(err instanceof ApiError ? err.message : "Impossible d'ajouter ce domaine");
     }
   };
 
@@ -666,8 +668,9 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <Input
                   value={newDomain}
-                  onChange={(e) => setNewDomain(e.target.value)}
-                  placeholder="domain.com ou *.domain.com"
+                  onChange={(e) => { setNewDomain(e.target.value); if (domainError) setDomainError(''); }}
+                  placeholder="acme.com ou *.acme.com"
+                  aria-invalid={!!domainError}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addDomain())}
                   className="flex-1"
                 />
@@ -676,6 +679,14 @@ export default function SettingsPage() {
                   Ajouter
                 </Button>
               </div>
+              {domainError ? (
+                <p className="text-xs text-destructive">{domainError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Domaine exact (<span className="font-mono">acme.com</span>) ou joker de sous-domaines
+                  (<span className="font-mono">*.acme.com</span>).
+                </p>
+              )}
               {allowedDomains.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {allowedDomains.map((d) => (
