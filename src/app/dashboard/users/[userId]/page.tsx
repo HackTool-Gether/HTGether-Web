@@ -99,6 +99,10 @@ export default function UserDetailPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Account deletion
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const load = useCallback(async () => {
     if (!token) return;
     try {
@@ -184,6 +188,20 @@ export default function UserDetailPage() {
   const handleRoleChange = (newRole: 'SUPER_ADMIN' | 'USER') => {
     setRole(newRole);
     setPermissions(resolvePermissions(newRole, {}));
+  };
+
+  const handleDelete = async () => {
+    if (!token || !user) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await usersApi.remove(user.id, token);
+      router.push('/dashboard/users');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur lors de la suppression');
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   };
 
   const togglePermission = (key: string) => {
@@ -434,6 +452,45 @@ export default function UserDetailPage() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Danger zone — account deletion */}
+      {!isSelf && (
+        <Card className="mt-6 border-destructive/30">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2 text-destructive">
+              <Trash2 className="h-4 w-4" />
+              Zone de danger
+            </CardTitle>
+            <CardDescription>
+              La suppression est définitive. Pour conserver le contenu produit par l&apos;utilisateur
+              (findings, notes, messages…), désactivez le compte plutôt que de le supprimer.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {confirmDelete ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm">
+                  Confirmer la suppression définitive de <strong>{user.email}</strong> ?
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                    {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Supprimer définitivement
+                  </Button>
+                  <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Supprimer le compte
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

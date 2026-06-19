@@ -270,6 +270,12 @@ export const usersApi = {
       method: 'POST',
       token,
     }),
+
+  remove: (id: string, token: string) =>
+    apiRequest<{ message: string }>(`/users/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
 };
 
 // Projects API
